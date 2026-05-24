@@ -56,15 +56,43 @@ function linksMatch(a: string, b: string): boolean {
   return false;
 }
 
-// Naver 검색 카페 섹션 선택자 (우선순위 순)
 const CAFE_SECTION_SELECTORS = [
   'section[data-cr-name="cafe"]',
   'div[data-cr-name="cafe"]',
   '#cafe',
   '.sc_new.cs_cafe',
   '[class*="cafe_wrap"]',
-  '[id*="cafe"]',
 ];
+
+function rankInRoot($: cheerio.CheerioAPI, root: cheerio.Cheerio<any>, resolvedLink: string) {
+  let foundRank: number | null = null;
+  let postStats: string | null = null;
+  let rank = 0;
+  const seenIds = new Set<string>();
+
+  root.find("a[href*='cafe.naver.com']").each((_, linkEl) => {
+    const href = $(linkEl).attr("href") || "";
+    const postId = extractCafePostId(href);
+    if (!postId) return; // 게시글 링크가 아닌 카페 홈/이름 링크 제외
+
+    if (seenIds.has(postId)) return; // 같은 게시글 ID는 한 번만 카운트
+    seenIds.add(postId);
+
+    rank++;
+    if (foundRank === null && linksMatch(href, resolvedLink)) {
+      foundRank = rank;
+      const $parent = $(linkEl).closest("li, .bx, article, [class*='item']");
+      if ($parent.length) {
+        const txt = $parent
+          .find(".etc_dsc_area, .sub_txt, .ldate, [class*='date'], [class*='info']")
+          .map((_, el) => $(el).text().trim()).get().filter(Boolean).join(" ");
+        if (txt) postStats = txt;
+      }
+    }
+  });
+
+  return { foundRank, postStats };
+}
 
 export async function checkNaverRanking(keyword: string, targetLink: string): Promise<ScrapeResult> {
   const resolvedLink = await resolveUrl(targetLink);
@@ -76,7 +104,7 @@ export async function checkNaverRanking(keyword: string, targetLink: string): Pr
     const response = await axios.get(searchUrl, { headers: HEADERS, timeout: 15000 });
     const $ = cheerio.load(response.data as string);
 
-    // 카페 전용 섹션 찾기
+    // 카페 전용 섹션 우선 탐색
     let cafeSection = $();
     for (const sel of CAFE_SECTION_SELECTORS) {
       const found = $(sel).first();
@@ -86,49 +114,15 @@ export async function checkNaverRanking(keyword: string, targetLink: string): Pr
       }
     }
 
-    let foundRank: number | null = null;
-    let postStats: string | null = null;
-
-    const countByItems = (root: cheerio.Cheerio<any>) => {
-      // 결과 항목(item) 단위로 순위 계산 - 하나의 항목에 링크가 여러 개여도 1개로 처리
-      const itemSelectors = "li.bx, li[class*='item'], .bx, article, li";
-      const items = root.find(itemSelectors).filter((_, el) => {
-        return $(el).find("a[href*='cafe.naver.com']").length > 0 &&
-          $(el).find("a[href*='cafe.naver.com']").toArray().some(a => extractCafePostId($(a).attr("href") || "") !== null);
-      });
-
-      // 중첩 제거: 다른 item의 자식인 item은 제외
-      const topItems: cheerio.Element[] = [];
-      items.each((_, el) => {
-        const isNested = topItems.some(parent => $(parent).find(el).length > 0);
-        if (!isNested) topItems.push(el);
-      });
-
-      topItems.forEach((el, idx) => {
-        const rank = idx + 1;
-        $(el).find("a[href*='cafe.naver.com']").each((_, linkEl) => {
-          const href = $(linkEl).attr("href") || "";
-          if (foundRank === null && linksMatch(href, resolvedLink)) {
-            foundRank = rank;
-            const txt = $(el)
-              .find(".etc_dsc_area, .sub_txt, .ldate, [class*='date'], [class*='info']")
-              .map((_, s) => $(s).text().trim()).get().filter(Boolean).join(" ");
-            if (txt) postStats = txt;
-          }
-        });
-      });
-    };
-
     if (cafeSection.length) {
-      countByItems(cafeSection);
+      const { foundRank, postStats } = rankInRoot($, cafeSection, resolvedLink);
+      if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
     }
 
-    // 카페 섹션을 못 찾은 경우 전체 페이지 fallback
-    if (foundRank === null) {
-      countByItems($("body"));
-    }
-
+    // 카페 섹션 미발견 시 전체 페이지 fallback
+    const { foundRank, postStats } = rankInRoot($, $("body"), resolvedLink);
     if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
+
     return { rank: null, status: "not_exposed", postStats: null };
   } catch (error) {
     console.error("Naver scraping error:", error);
