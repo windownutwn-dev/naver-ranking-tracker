@@ -21,7 +21,7 @@ export default withAuth(async (req, res, user) => {
         user: { select: { id: true, name: true, username: true } },
         rankings: { orderBy: { checkedAt: "desc" }, take: 1 },
       },
-      orderBy: sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" },
+      orderBy: sort === "oldest" ? { createdAt: "asc" } : sort === "alpha" ? { keyword: "asc" } : { createdAt: "desc" },
     });
 
     let result = keywords;

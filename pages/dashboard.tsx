@@ -60,7 +60,7 @@ export default function DashboardPage() {
       cafeName: filters.cafeName !== "전체" ? filters.cafeName : "",
       status: filters.status !== "전체" ? filters.status : "",
       manager: filters.manager !== "전체" ? filters.manager : "",
-      sort: filters.sort === "오래된순" ? "oldest" : "latest",
+      sort: filters.sort === "오래된순" ? "oldest" : filters.sort === "가나다순" ? "alpha" : "latest",
       deleted: showDeleted ? "true" : "false",
     });
     const res = await fetch(`/api/keywords?${params}`);
@@ -354,6 +354,7 @@ export default function DashboardPage() {
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
                     <option>최신순</option>
                     <option>오래된순</option>
+                    <option>가나다순</option>
                   </select>
                 </div>
               </div>
