@@ -224,7 +224,7 @@ export default function DashboardPage() {
 
             {/* Inline Add Form */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-              <form onSubmit={handleAdd}>
+              <form onSubmit={handleAdd} autoComplete="off">
                 <div className="flex gap-2 mb-2">
                   <input value={addForm.link} onChange={(e) => setAddForm((p) => ({ ...p, link: e.target.value }))}
                     className={inputCls} placeholder="카페 링크 *" required />
@@ -418,7 +418,7 @@ export default function DashboardPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
             <h3 className="text-base font-semibold text-gray-900 mb-4">수정</h3>
-            <form onSubmit={handleEdit} className="space-y-3">
+            <form onSubmit={handleEdit} className="space-y-3" autoComplete="off">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="text-xs font-medium text-gray-600">카페 링크 *</label>
