@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  username  String    @unique
+  password  String
+  role      String    @default("user")
+  approved  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  keywords  Keyword[]
+}
+
+model Keyword {
+  id                  Int       @id @default(autoincrement())
+  userId              Int
+  user                User      @relation(fields: [userId], references: [id])
+  link                String
+  keyword             String
+  brand               String?
+  productName         String?
+  cafeName            String?
+  manager             String?
+  group               String?
+  memo                String?
+  notificationEnabled Boolean   @default(true)
+  pinned              Boolean   @default(false)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  rankings            Ranking[]
+}
+
+model Ranking {
+  id        Int      @id @default(autoincrement())
+  keywordId Int
+  keyword   Keyword  @relation(fields: [keywordId], references: [id])
+  rank      Int?
+  status    String   @default("not_checked")
+  postStats String?
+  checkedAt DateTime @default(now())
+}
+
+model BatchSetting {
+  id            Int       @id @default(1)
+  enabled       Boolean   @default(true)
+  intervalHours Int       @default(4)
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  updatedAt     DateTime  @updatedAt
+}
