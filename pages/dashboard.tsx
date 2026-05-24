@@ -27,9 +27,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [keywords, setKeywords] = useState<Keyword[]>([]);
-  const [groups, setGroups] = useState<string[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [cafeNames, setCafeNames] = useState<string[]>([]);
   const [managers, setManagers] = useState<{ id: number; name: string }[]>([]);
-  const [filters, setFilters] = useState({ group: "전체", status: "전체", manager: "전체", sort: "최신순" });
+  const [filters, setFilters] = useState({ brand: "전체", cafeName: "전체", status: "전체", manager: "전체", sort: "최신순" });
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<number | null>(null);
@@ -54,7 +55,8 @@ export default function DashboardPage() {
   const fetchKeywords = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({
-      group: filters.group !== "전체" ? filters.group : "",
+      brand: filters.brand !== "전체" ? filters.brand : "",
+      cafeName: filters.cafeName !== "전체" ? filters.cafeName : "",
       status: filters.status !== "전체" ? filters.status : "",
       manager: filters.manager !== "전체" ? filters.manager : "",
       sort: filters.sort === "오래된순" ? "oldest" : "latest",
@@ -64,7 +66,8 @@ export default function DashboardPage() {
     if (res.ok) {
       const data = await res.json();
       setKeywords(data.keywords);
-      setGroups(data.groups || []);
+      setBrands(data.brands || []);
+      setCafeNames(data.cafeNames || []);
       setManagers(data.managers || []);
     }
     setLoading(false);
@@ -286,10 +289,15 @@ export default function DashboardPage() {
                   <a href="/api/keywords/excel" className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700">
                     엑셀 다운로드
                   </a>
-                  <select value={filters.group} onChange={(e) => setFilters({ ...filters, group: e.target.value })}
+                  <select value={filters.cafeName} onChange={(e) => setFilters({ ...filters, cafeName: e.target.value })}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
-                    <option>전체 그룹</option>
-                    {groups.map((g) => <option key={g}>{g}</option>)}
+                    <option value="전체">전체 카페명</option>
+                    {cafeNames.map((c) => <option key={c} value={c!}>{c}</option>)}
+                  </select>
+                  <select value={filters.brand} onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
+                    <option value="전체">전체 브랜드</option>
+                    {brands.map((b) => <option key={b} value={b!}>{b}</option>)}
                   </select>
                   <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
@@ -301,7 +309,7 @@ export default function DashboardPage() {
                   {user.role === "admin" && (
                     <select value={filters.manager} onChange={(e) => setFilters({ ...filters, manager: e.target.value })}
                       className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
-                      <option>전체 등록자</option>
+                      <option value="전체">전체 등록자</option>
                       {managers.map((m) => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
                     </select>
                   )}
@@ -330,8 +338,9 @@ export default function DashboardPage() {
                       <th className="py-3 text-left font-medium">키워드</th>
                       <th className="py-3 text-left font-medium w-20">랭킹</th>
                       <th className="py-3 text-left font-medium w-20">알림</th>
-                      <th className="py-3 text-left font-medium w-32">게시글</th>
-                      <th className="py-3 text-left font-medium w-24">그룹</th>
+                      <th className="py-3 text-left font-medium w-28">카페명</th>
+                      <th className="py-3 text-left font-medium w-24">브랜드</th>
+                      <th className="py-3 text-left font-medium w-24">제품명</th>
                       <th className="py-3 text-left font-medium w-32">확인일시</th>
                       <th className="py-3 text-left font-medium w-28">메모</th>
                       <th className="py-3 w-24"></th>
@@ -369,10 +378,15 @@ export default function DashboardPage() {
                               <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${kw.notificationEnabled ? "translate-x-5" : "translate-x-1"}`} />
                             </button>
                           </td>
-                          <td className="py-3 text-xs text-gray-600">{latest?.postStats || "-"}</td>
+                          <td className="py-3 text-xs text-gray-600">{kw.cafeName || "-"}</td>
                           <td className="py-3">
-                            {kw.group ? (
-                              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{kw.group}</span>
+                            {kw.brand ? (
+                              <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-xs">{kw.brand}</span>
+                            ) : <span className="text-gray-300 text-xs">-</span>}
+                          </td>
+                          <td className="py-3">
+                            {kw.productName ? (
+                              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{kw.productName}</span>
                             ) : <span className="text-gray-300 text-xs">-</span>}
                           </td>
                           <td className="py-3 text-xs text-gray-500">{latest ? formatDate(latest.checkedAt) : "-"}</td>

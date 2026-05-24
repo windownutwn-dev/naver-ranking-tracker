@@ -4,31 +4,25 @@ import { withAuth } from "@/lib/auth";
 
 export default withAuth(async (req, res, user) => {
   if (req.method === "GET") {
-    const { group, status, manager, sort, deleted } = req.query;
+    const { brand, cafeName, status, manager, sort, deleted } = req.query;
 
     const where: any = {
       deletedAt: deleted === "true" ? { not: null } : null,
     };
 
     if (user.role !== "admin") where.userId = user.id;
-    if (group && group !== "전체") where.group = group;
+    if (brand && brand !== "전체") where.brand = brand;
+    if (cafeName && cafeName !== "전체") where.cafeName = cafeName;
     if (manager && manager !== "전체") where.userId = parseInt(manager as string);
 
     const keywords = await prisma.keyword.findMany({
       where,
       include: {
         user: { select: { id: true, name: true, username: true } },
-        rankings: {
-          orderBy: { checkedAt: "desc" },
-          take: 1,
-        },
+        rankings: { orderBy: { checkedAt: "desc" }, take: 1 },
       },
       orderBy:
-        sort === "oldest"
-          ? { createdAt: "asc" }
-          : sort === "rank"
-          ? { id: "asc" }
-          : { createdAt: "desc" },
+        sort === "oldest" ? { createdAt: "asc" } : { createdAt: "desc" },
     });
 
     // Apply status filter after join
@@ -41,20 +35,21 @@ export default withAuth(async (req, res, user) => {
       });
     }
 
-    // Get unique groups and managers for filters
+    // Get unique values for filter dropdowns
     const allKeywords = await prisma.keyword.findMany({
       where: user.role === "admin" ? { deletedAt: null } : { userId: user.id, deletedAt: null },
-      select: { group: true, userId: true, user: { select: { id: true, name: true } } },
+      select: { brand: true, cafeName: true, userId: true, user: { select: { id: true, name: true } } },
     });
 
-    const groups = [...new Set(allKeywords.map((k) => k.group).filter(Boolean))];
+    const brands = [...new Set(allKeywords.map((k) => k.brand).filter(Boolean))];
+    const cafeNames = [...new Set(allKeywords.map((k) => k.cafeName).filter(Boolean))];
     const managers = [
       ...new Map(
         allKeywords.map((k) => [k.userId, { id: k.user.id, name: k.user.name }])
       ).values(),
     ];
 
-    return res.status(200).json({ keywords: result, groups, managers });
+    return res.status(200).json({ keywords: result, brands, cafeNames, managers });
   }
 
   if (req.method === "POST") {
@@ -66,8 +61,7 @@ export default withAuth(async (req, res, user) => {
     const created = await prisma.keyword.create({
       data: {
         userId: user.id,
-        link,
-        keyword,
+        link, keyword,
         brand: brand || null,
         productName: productName || null,
         cafeName: cafeName || null,
