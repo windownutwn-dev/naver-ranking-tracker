@@ -29,8 +29,9 @@ export default function DashboardPage() {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [cafeNames, setCafeNames] = useState<string[]>([]);
+  const [productNames, setProductNames] = useState<string[]>([]);
   const [managers, setManagers] = useState<string[]>([]);
-  const [filters, setFilters] = useState({ brand: "전체", cafeName: "전체", status: "전체", manager: "전체", sort: "최신순" });
+  const [filters, setFilters] = useState({ brand: "전체", cafeName: "전체", productName: "전체", status: "전체", manager: "전체", sort: "최신순" });
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<number | null>(null);
@@ -64,6 +65,7 @@ export default function DashboardPage() {
     const params = new URLSearchParams({
       brand: filters.brand !== "전체" ? filters.brand : "",
       cafeName: filters.cafeName !== "전체" ? filters.cafeName : "",
+      productName: filters.productName !== "전체" ? filters.productName : "",
       status: filters.status !== "전체" ? filters.status : "",
       manager: filters.manager !== "전체" ? filters.manager : "",
       sort: filters.sort === "오래된순" ? "oldest" : filters.sort === "가나다순" ? "alpha" : "latest",
@@ -75,6 +77,7 @@ export default function DashboardPage() {
       setKeywords(data.keywords);
       setBrands(data.brands || []);
       setCafeNames(data.cafeNames || []);
+      setProductNames((data.productNames || []).filter(Boolean));
       setManagers((data.managers || []).filter(Boolean));
     }
     setLoading(false);
@@ -421,6 +424,11 @@ export default function DashboardPage() {
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
                     <option value="전체">전체 브랜드</option>
                     {brands.map((b) => <option key={b} value={b!}>{b}</option>)}
+                  </select>
+                  <select value={filters.productName} onChange={(e) => setFilters({ ...filters, productName: e.target.value })}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
+                    <option value="전체">전체 제품명</option>
+                    {productNames.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                   <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
