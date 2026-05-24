@@ -249,7 +249,7 @@ export default function DashboardPage() {
                     className={inputCls} placeholder="담당자" />
                   <input value={addForm.group} onChange={(e) => setAddForm((p) => ({ ...p, group: e.target.value }))}
                     list="group-list" className={inputCls} placeholder="그룹" />
-                  <datalist id="group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
+                  <datalist id="group-list">{brands.map((b) => <option key={b} value={b || ""} />)}</datalist>
                 </div>
                 {addError && <p className="text-red-500 text-xs mt-2 bg-red-50 px-3 py-1.5 rounded-lg">{addError}</p>}
               </form>
@@ -471,7 +471,7 @@ export default function DashboardPage() {
                   <input value={editForm.group} onChange={(e) => setEditForm((p) => ({ ...p, group: e.target.value }))}
                     list="edit-group-list"
                     className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="그룹명" />
-                  <datalist id="edit-group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
+                  <datalist id="edit-group-list">{brands.map((b) => <option key={b} value={b || ""} />)}</datalist>
                 </div>
               </div>
               {editError && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{editError}</p>}
