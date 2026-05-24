@@ -64,16 +64,45 @@ const CAFE_SECTION_SELECTORS = [
   '[class*="cafe_wrap"]',
 ];
 
-// 이미지 클러스터 컨테이너 클래스 패턴 (카페 섹션 내 이미지 박스 - 텍스트 순위에서 제외)
-const IMAGE_CLUSTER_PATTERN = /cluster_photo|lst_image|image_lst|photo_area|img_lst|cluster_img|thumb_area|img_area|cluster_tit|view_img/i;
+// 네이버 새 구조: div.sc_new 섹션 단위로 카운트 (각 섹션 = 카페 카드 한 장)
+function rankBySections($: cheerio.CheerioAPI, resolvedLink: string) {
+  let foundRank: number | null = null;
+  let postStats: string | null = null;
+  let cafeRank = 0;
 
-function isInsideImageCluster($: cheerio.CheerioAPI, el: any): boolean {
-  return $(el).parents().toArray().some((parent) => {
-    const cls = $(parent).attr("class") || "";
-    return IMAGE_CLUSTER_PATTERN.test(cls);
+  $("div.sc_new").each((_, section) => {
+    const $section = $(section);
+    // 이 섹션에 카페 게시글 링크가 있는지 확인
+    const hasCafePost = $section.find("a[href*='cafe.naver.com']").toArray().some((a) => {
+      const href = $(a).attr("href") || "";
+      return extractCafePostId(href) !== null;
+    });
+    if (!hasCafePost) return;
+
+    cafeRank++;
+
+    if (foundRank === null) {
+      $section.find("a[href*='cafe.naver.com']").each((_, a) => {
+        const href = $(a).attr("href") || "";
+        if (!extractCafePostId(href)) return;
+        if (foundRank === null && linksMatch(href, resolvedLink)) {
+          foundRank = cafeRank;
+          const $parent = $(a).closest("li, .bx, article, [class*='item']");
+          if ($parent.length) {
+            const txt = $parent
+              .find(".etc_dsc_area, .sub_txt, .ldate, [class*='date'], [class*='info']")
+              .map((_, el) => $(el).text().trim()).get().filter(Boolean).join(" ");
+            if (txt) postStats = txt;
+          }
+        }
+      });
+    }
   });
+
+  return { foundRank, postStats };
 }
 
+// 구버전 fallback: 섹션 구조 없을 때 링크 단위 카운트
 function rankInRoot($: cheerio.CheerioAPI, root: cheerio.Cheerio<any>, resolvedLink: string) {
   let foundRank: number | null = null;
   let postStats: string | null = null;
@@ -83,14 +112,9 @@ function rankInRoot($: cheerio.CheerioAPI, root: cheerio.Cheerio<any>, resolvedL
   root.find("a[href*='cafe.naver.com']").each((_, linkEl) => {
     const href = $(linkEl).attr("href") || "";
     const postId = extractCafePostId(href);
-    if (!postId) return; // 게시글 링크가 아닌 카페 홈/이름 링크 제외
-
-    // 이미지 클러스터 안의 링크는 순위 카운트에서 제외
-    if (isInsideImageCluster($, linkEl)) return;
-
-    if (seenIds.has(postId)) return; // 같은 게시글 ID는 한 번만 카운트
+    if (!postId) return;
+    if (seenIds.has(postId)) return;
     seenIds.add(postId);
-
     rank++;
     if (foundRank === null && linksMatch(href, resolvedLink)) {
       foundRank = rank;
@@ -117,7 +141,13 @@ export async function checkNaverRanking(keyword: string, targetLink: string): Pr
     const response = await axios.get(searchUrl, { headers: HEADERS, timeout: 15000 });
     const $ = cheerio.load(response.data as string);
 
-    // 카페 전용 섹션 우선 탐색
+    // 새 Naver 구조: div.sc_new 섹션 단위로 카운트 (카드 기준 순위)
+    if ($("div.sc_new").length > 0) {
+      const { foundRank, postStats } = rankBySections($, resolvedLink);
+      if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
+    }
+
+    // 구버전 fallback: 카페 전용 섹션 탐색 후 링크 단위 카운트
     let cafeSection = $();
     for (const sel of CAFE_SECTION_SELECTORS) {
       const found = $(sel).first();
@@ -126,13 +156,10 @@ export async function checkNaverRanking(keyword: string, targetLink: string): Pr
         break;
       }
     }
-
     if (cafeSection.length) {
       const { foundRank, postStats } = rankInRoot($, cafeSection, resolvedLink);
       if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
     }
-
-    // 카페 섹션 미발견 시 전체 페이지 fallback
     const { foundRank, postStats } = rankInRoot($, $("body"), resolvedLink);
     if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
 
