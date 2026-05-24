@@ -58,6 +58,17 @@ export default withAuth(async (req, res, user) => {
       return res.status(400).json({ error: "카페 링크와 키워드는 필수입니다." });
     }
 
+    // Check duplicate keyword (ignoring spaces)
+    const normalized = (keyword as string).replace(/\s/g, "");
+    const allKw = await prisma.keyword.findMany({
+      where: user.role === "admin" ? { deletedAt: null } : { userId: user.id, deletedAt: null },
+      select: { id: true, keyword: true, link: true, brand: true, productName: true, cafeName: true, manager: true, group: true },
+    });
+    const duplicate = allKw.find((k) => k.keyword.replace(/\s/g, "") === normalized);
+    if (duplicate) {
+      return res.status(409).json({ duplicate: true, existing: duplicate });
+    }
+
     const created = await prisma.keyword.create({
       data: {
         userId: user.id,

@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const [editError, setEditError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [notification, setNotification] = useState("");
+  const [duplicateKeyword, setDuplicateKeyword] = useState<{ id: number; keyword: string } | null>(null);
 
   const showNotif = (msg: string) => { setNotification(msg); setTimeout(() => setNotification(""), 3000); };
 
@@ -85,11 +86,34 @@ export default function DashboardPage() {
       body: JSON.stringify(addForm),
     });
     const data = await res.json();
+    if (res.status === 409 && data.duplicate) {
+      setFormLoading(false);
+      setDuplicateKeyword(data.existing);
+      return;
+    }
     if (!res.ok) { setAddError(data.error); setFormLoading(false); return; }
     setAddForm({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
     fetchKeywords();
     showNotif("키워드가 등록되었습니다.");
     setFormLoading(false);
+  };
+
+  const handleDuplicateEdit = () => {
+    if (!duplicateKeyword) return;
+    const existing = keywords.find((k) => k.id === duplicateKeyword.id);
+    if (existing) {
+      openEdit(existing);
+    } else {
+      // keyword might not be in current filtered list, load from form data
+      setEditKeyword({ id: duplicateKeyword.id } as any);
+      setEditForm({
+        link: addForm.link, keyword: addForm.keyword, brand: addForm.brand,
+        productName: addForm.productName, cafeName: addForm.cafeName,
+        manager: addForm.manager, group: addForm.group,
+      });
+      setEditError("");
+    }
+    setDuplicateKeyword(null);
   };
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -426,6 +450,30 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Duplicate Confirm Modal */}
+      {duplicateKeyword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4 text-center">
+            <div className="text-3xl mb-3">⚠️</div>
+            <h3 className="text-base font-semibold text-gray-900 mb-2">중복 키워드가 있습니다</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-medium text-blue-600">"{duplicateKeyword.keyword}"</span> 키워드가 이미 등록되어 있습니다.
+            </p>
+            <p className="text-sm text-gray-600 mb-5">내용을 수정하시겠습니까?</p>
+            <div className="flex gap-2">
+              <button onClick={() => setDuplicateKeyword(null)}
+                className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                취소
+              </button>
+              <button onClick={handleDuplicateEdit}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                수정하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editKeyword && (
