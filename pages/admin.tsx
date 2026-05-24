@@ -11,6 +11,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [createForm, setCreateForm] = useState({ name: "", username: "", password: "", role: "user" });
+  const [createError, setCreateError] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const showMsg = (msg: string) => { setMessage(msg); setTimeout(() => setMessage(""), 3000); };
 
@@ -57,6 +61,24 @@ export default function AdminPage() {
     showMsg("삭제되었습니다.");
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreateLoading(true);
+    setCreateError("");
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(createForm),
+    });
+    const data = await res.json();
+    if (!res.ok) { setCreateError(data.error); setCreateLoading(false); return; }
+    setCreateForm({ name: "", username: "", password: "", role: "user" });
+    setShowCreateForm(false);
+    fetchUsers();
+    showMsg(`${data.user.name} 계정이 생성되었습니다.`);
+    setCreateLoading(false);
+  };
+
   if (!me) return <div className="min-h-screen flex items-center justify-center"><span className="text-gray-400">로딩 중...</span></div>;
 
   return (
@@ -92,12 +114,65 @@ export default function AdminPage() {
         </aside>
 
         <main className="flex-1 overflow-auto p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">사용자 관리</h2>
-          <p className="text-sm text-gray-500 mb-6">회원가입 승인 및 권한 관리</p>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 mb-1">사용자 관리</h2>
+              <p className="text-sm text-gray-500">회원가입 승인 및 권한 관리</p>
+            </div>
+            <button onClick={() => setShowCreateForm(!showCreateForm)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+              + 계정 직접 생성
+            </button>
+          </div>
+
+          {showCreateForm && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">새 계정 생성 (즉시 승인됨)</h3>
+              <form onSubmit={handleCreateUser} className="flex gap-3 flex-wrap items-end">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">이름</label>
+                  <input value={createForm.name} onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28" placeholder="홍길동" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">아이디</label>
+                  <input value={createForm.username} onChange={(e) => setCreateForm((p) => ({ ...p, username: e.target.value }))}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28" placeholder="user123" required autoComplete="off" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">비밀번호</label>
+                  <input type="text" value={createForm.password} onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28" placeholder="4자 이상" required autoComplete="off" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">권한</label>
+                  <select value={createForm.role} onChange={(e) => setCreateForm((p) => ({ ...p, role: e.target.value }))}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="user">일반</option>
+                    <option value="admin">관리자</option>
+                  </select>
+                </div>
+                {createError && <p className="text-red-500 text-xs w-full">{createError}</p>}
+                <button type="submit" disabled={createLoading}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {createLoading ? "생성 중..." : "계정 생성"}
+                </button>
+                <button type="button" onClick={() => setShowCreateForm(false)}
+                  className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">
+                  취소
+                </button>
+              </form>
+            </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100 bg-amber-50">
-              <p className="text-xs text-amber-700">미승인 사용자: {users.filter((u) => !u.approved).length}명</p>
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-xs text-gray-500">전체 {users.length}명</p>
+              {users.filter((u) => !u.approved).length > 0 && (
+                <p className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-lg">
+                  승인 대기 {users.filter((u) => !u.approved).length}명
+                </p>
+              )}
             </div>
             {loading ? (
               <div className="py-12 text-center text-gray-400">로딩 중...</div>
@@ -115,8 +190,8 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {users.map((u) => (
-                    <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!u.approved ? "bg-amber-50/40" : ""}`}>
+                  {[...users].sort((a, b) => Number(a.approved) - Number(b.approved)).map((u) => (
+                    <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!u.approved ? "bg-amber-50/50" : ""}`}>
                       <td className="px-4 py-3 font-medium text-gray-900">{u.name}</td>
                       <td className="px-4 py-3 text-gray-600">{u.username}</td>
                       <td className="px-4 py-3 text-gray-600">{u._count.keywords}개</td>

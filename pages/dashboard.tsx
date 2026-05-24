@@ -43,6 +43,7 @@ export default function DashboardPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [notification, setNotification] = useState("");
   const [duplicateKeyword, setDuplicateKeyword] = useState<{ id: number; keyword: string } | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [bulkRefreshing, setBulkRefreshing] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState<{ current: number; total: number } | null>(null);
   const [bulkRows, setBulkRows] = useState<any[]>([]);
@@ -80,6 +81,14 @@ export default function DashboardPage() {
   }, [filters, showDeleted]);
 
   useEffect(() => { if (user) fetchKeywords(); }, [user, fetchKeywords]);
+
+  useEffect(() => {
+    if (user?.role === "admin") {
+      fetch("/api/admin/users").then((r) => r.ok ? r.json() : null).then((d) => {
+        if (d?.users) setPendingCount(d.users.filter((u: any) => !u.approved).length);
+      });
+    }
+  }, [user]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,6 +309,11 @@ export default function DashboardPage() {
               <a href="/admin" className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 사용자 관리
+                {pendingCount > 0 && (
+                  <span className="ml-auto bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                    {pendingCount}
+                  </span>
+                )}
               </a>
             )}
           </nav>
