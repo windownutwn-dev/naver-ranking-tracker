@@ -43,6 +43,9 @@ export default function DashboardPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [notification, setNotification] = useState("");
   const [duplicateKeyword, setDuplicateKeyword] = useState<{ id: number; keyword: string } | null>(null);
+  const [bulkRows, setBulkRows] = useState<any[]>([]);
+  const [bulkPreview, setBulkPreview] = useState<{ total: number; newCount: number; duplicateCount: number; exposedDuplicateCount: number; duplicates: any[] } | null>(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const showNotif = (msg: string) => { setNotification(msg); setTimeout(() => setNotification(""), 3000); };
 
@@ -192,13 +195,51 @@ export default function DashboardPage() {
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await fetch("/api/keywords/bulk-upload", { method: "POST", body: fd });
-    const data = await res.json();
-    showNotif(data.message || "업로드 완료");
-    fetchKeywords();
     e.target.value = "";
+    setBulkLoading(true);
+    try {
+      const XLSX = await import("xlsx");
+      const ab = await file.arrayBuffer();
+      const wb = XLSX.read(ab);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<any>(ws, { defval: "" });
+      const rows = raw.map((r: any) => ({
+        link: String(r["카페링크"] || r["링크"] || "").trim(),
+        keyword: String(r["키워드"] || r["검색키워드"] || "").trim(),
+        brand: String(r["브랜드"] || "").trim(),
+        productName: String(r["제품명"] || "").trim(),
+        cafeName: String(r["카페명"] || "").trim(),
+        manager: String(r["담당자"] || "").trim(),
+        group: String(r["그룹"] || r["제품그룹"] || "").trim(),
+      })).filter((r: any) => r.link && r.keyword);
+      if (!rows.length) { showNotif("유효한 데이터가 없습니다."); setBulkLoading(false); return; }
+      const res = await fetch("/api/keywords/bulk-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preview", rows }),
+      });
+      const data = await res.json();
+      setBulkRows(rows);
+      setBulkPreview(data);
+    } catch {
+      showNotif("파일 파싱 중 오류가 발생했습니다.");
+    }
+    setBulkLoading(false);
+  };
+
+  const handleBulkCreate = async (strategy: "all" | "exposed_only") => {
+    setBulkLoading(true);
+    const res = await fetch("/api/keywords/bulk-upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create", strategy, rows: bulkRows }),
+    });
+    const data = await res.json();
+    setBulkPreview(null);
+    setBulkRows([]);
+    fetchKeywords();
+    showNotif(data.message || "등록 완료");
+    setBulkLoading(false);
   };
 
   const openEdit = (kw: Keyword) => {
@@ -466,6 +507,78 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Bulk Upload Modal */}
+      {bulkPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-4 text-center">엑셀 업로드 미리보기</h3>
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">전체 키워드</span>
+                <span className="font-semibold">{bulkPreview.total}개</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">신규 키워드</span>
+                <span className="font-semibold text-green-600">{bulkPreview.newCount}개</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">중복 키워드</span>
+                <span className="font-semibold text-amber-600">{bulkPreview.duplicateCount}개</span>
+              </div>
+              {bulkPreview.duplicateCount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">중복 중 노출중</span>
+                  <span className="font-semibold text-blue-600">{bulkPreview.exposedDuplicateCount}개</span>
+                </div>
+              )}
+            </div>
+            {bulkPreview.duplicateCount > 0 && (
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-1.5">중복 키워드 목록</p>
+                <div className="max-h-36 overflow-y-auto bg-amber-50 rounded-lg p-2 space-y-1">
+                  {bulkPreview.duplicates.map((d: any, i: number) => (
+                    <div key={i} className="flex justify-between items-center text-xs">
+                      <span className="text-gray-700 truncate mr-2">{d.keyword}</span>
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${
+                        d.existing.latestStatus === "exposed" ? "bg-blue-100 text-blue-700"
+                        : d.existing.latestStatus === "not_exposed" ? "bg-red-100 text-red-700"
+                        : "bg-gray-100 text-gray-500"
+                      }`}>
+                        {d.existing.latestStatus === "exposed" ? "노출중"
+                          : d.existing.latestStatus === "not_exposed" ? "비노출" : "미확인"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              {bulkPreview.duplicateCount === 0 ? (
+                <button onClick={() => handleBulkCreate("all")} disabled={bulkLoading}
+                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {bulkLoading ? "등록 중..." : `${bulkPreview.total}개 모두 등록`}
+                </button>
+              ) : (
+                <>
+                  <button onClick={() => handleBulkCreate("all")} disabled={bulkLoading}
+                    className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                    {bulkLoading ? "등록 중..." : `중복 키워드 모두 등록 (${bulkPreview.total}개)`}
+                  </button>
+                  <button onClick={() => handleBulkCreate("exposed_only")} disabled={bulkLoading}
+                    className="w-full bg-green-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
+                    {bulkLoading ? "등록 중..." : `중복 키워드 중 노출된 것만 등록 (${bulkPreview.newCount + bulkPreview.exposedDuplicateCount}개)`}
+                  </button>
+                </>
+              )}
+              <button onClick={() => { setBulkPreview(null); setBulkRows([]); }} disabled={bulkLoading}
+                className="w-full border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Duplicate Confirm Modal */}
       {duplicateKeyword && (
