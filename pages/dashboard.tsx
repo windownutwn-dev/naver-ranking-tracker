@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [keywords, setKeywords] = useState<Keyword[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [cafeNames, setCafeNames] = useState<string[]>([]);
-  const [managers, setManagers] = useState<{ id: number; name: string }[]>([]);
+  const [managers, setManagers] = useState<string[]>([]);
   const [filters, setFilters] = useState({ brand: "전체", cafeName: "전체", status: "전체", manager: "전체", sort: "최신순" });
   const [selected, setSelected] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +69,7 @@ export default function DashboardPage() {
       setKeywords(data.keywords);
       setBrands(data.brands || []);
       setCafeNames(data.cafeNames || []);
-      setManagers(data.managers || []);
+      setManagers((data.managers || []).filter(Boolean));
     }
     setLoading(false);
   }, [filters, showDeleted]);
@@ -104,7 +104,6 @@ export default function DashboardPage() {
     if (existing) {
       openEdit(existing);
     } else {
-      // keyword might not be in current filtered list, load from form data
       setEditKeyword({ id: duplicateKeyword.id } as any);
       setEditForm({
         link: addForm.link, keyword: addForm.keyword, brand: addForm.brand,
@@ -114,6 +113,22 @@ export default function DashboardPage() {
       setEditError("");
     }
     setDuplicateKeyword(null);
+  };
+
+  const handleForceAdd = async () => {
+    setDuplicateKeyword(null);
+    setFormLoading(true);
+    const res = await fetch("/api/keywords", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...addForm, force: true }),
+    });
+    if (res.ok) {
+      setAddForm({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
+      fetchKeywords();
+      showNotif("키워드가 등록되었습니다.");
+    }
+    setFormLoading(false);
   };
 
   const handleEdit = async (e: React.FormEvent) => {
@@ -330,13 +345,11 @@ export default function DashboardPage() {
                     <option value="not_exposed">비노출</option>
                     <option value="deleted">삭제</option>
                   </select>
-                  {user.role === "admin" && (
-                    <select value={filters.manager} onChange={(e) => setFilters({ ...filters, manager: e.target.value })}
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
-                      <option value="전체">전체 등록자</option>
-                      {managers.map((m) => <option key={m.id} value={String(m.id)}>{m.name}</option>)}
-                    </select>
-                  )}
+                  <select value={filters.manager} onChange={(e) => setFilters({ ...filters, manager: e.target.value })}
+                    className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
+                    <option value="전체">전체 담당자</option>
+                    {managers.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
                   <select value={filters.sort} onChange={(e) => setFilters({ ...filters, sort: e.target.value })}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
                     <option>최신순</option>
@@ -365,6 +378,7 @@ export default function DashboardPage() {
                       <th className="py-3 text-left font-medium w-28">카페명</th>
                       <th className="py-3 text-left font-medium w-24">브랜드</th>
                       <th className="py-3 text-left font-medium w-24">제품명</th>
+                      <th className="py-3 text-left font-medium w-20">담당자</th>
                       <th className="py-3 text-left font-medium w-32">확인일시</th>
                       <th className="py-3 text-left font-medium w-28">메모</th>
                       <th className="py-3 w-24"></th>
@@ -413,6 +427,7 @@ export default function DashboardPage() {
                               <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">{kw.productName}</span>
                             ) : <span className="text-gray-300 text-xs">-</span>}
                           </td>
+                          <td className="py-3 text-xs text-gray-600">{kw.manager || "-"}</td>
                           <td className="py-3 text-xs text-gray-500">{latest ? formatDate(latest.checkedAt) : "-"}</td>
                           <td className="py-3">
                             <input defaultValue={kw.memo || ""}
@@ -469,6 +484,10 @@ export default function DashboardPage() {
               <button onClick={handleDuplicateEdit}
                 className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
                 수정하기
+              </button>
+              <button onClick={handleForceAdd}
+                className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700">
+                추가 등록하기
               </button>
             </div>
           </div>
