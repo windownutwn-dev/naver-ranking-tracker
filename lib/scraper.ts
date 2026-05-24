@@ -38,7 +38,6 @@ async function checkIfDeleted(url: string): Promise<boolean> {
 }
 
 function extractCafePostId(url: string): string | null {
-  // Extract articleid from cafe.naver.com/cafename/12345 or cafe.naver.com/ArticleRead.nhn?articleid=12345
   const m1 = url.match(/cafe\.naver\.com\/[^/?#]+\/(\d+)/);
   if (m1) return m1[1];
   const m2 = url.match(/[?&]articleid=(\d+)/i);
@@ -51,14 +50,21 @@ function linksMatch(a: string, b: string): boolean {
   const na = normalize(a);
   const nb = normalize(b);
   if (na === nb || na.includes(nb) || nb.includes(na)) return true;
-
-  // Match by post ID
   const idA = extractCafePostId(a);
   const idB = extractCafePostId(b);
   if (idA && idB && idA === idB) return true;
-
   return false;
 }
+
+// Naver 검색 카페 섹션 선택자 (우선순위 순)
+const CAFE_SECTION_SELECTORS = [
+  'section[data-cr-name="cafe"]',
+  'div[data-cr-name="cafe"]',
+  '#cafe',
+  '.sc_new.cs_cafe',
+  '[class*="cafe_wrap"]',
+  '[id*="cafe"]',
+];
 
 export async function checkNaverRanking(keyword: string, targetLink: string): Promise<ScrapeResult> {
   const resolvedLink = await resolveUrl(targetLink);
@@ -70,44 +76,70 @@ export async function checkNaverRanking(keyword: string, targetLink: string): Pr
     const response = await axios.get(searchUrl, { headers: HEADERS, timeout: 15000 });
     const $ = cheerio.load(response.data as string);
 
+    // 카페 전용 섹션 찾기
+    let cafeSection = $();
+    for (const sel of CAFE_SECTION_SELECTORS) {
+      const found = $(sel).first();
+      if (found.length && found.find("a[href*='cafe.naver.com']").length > 0) {
+        cafeSection = found;
+        break;
+      }
+    }
+
     let foundRank: number | null = null;
     let postStats: string | null = null;
-    let cafeRank = 0;
 
-    // Collect all unique cafe links in order of appearance (all sections including 인기글)
-    const seen = new Set<string>();
+    if (cafeSection.length) {
+      // 카페 섹션 내에서만 순위 계산
+      let rank = 0;
+      const seen = new Set<string>();
 
-    $("a[href]").each((_, linkEl) => {
-      const href = $(linkEl).attr("href") || "";
+      cafeSection.find("a[href*='cafe.naver.com']").each((_, linkEl) => {
+        const href = $(linkEl).attr("href") || "";
+        if (!href.includes("cafe.naver.com")) return;
 
-      // Only consider cafe.naver.com links
-      if (!href.includes("cafe.naver.com")) return;
+        // 실제 게시글 링크만 (카페 홈/카페명 링크 제외)
+        const postId = extractCafePostId(href);
+        if (!postId) return;
 
-      // Deduplicate: same link shouldn't count twice
-      const normalized = href.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
-      if (seen.has(normalized)) return;
+        const key = href.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+        if (seen.has(key)) return;
+        seen.add(key);
 
-      // Skip navigation/menu links (very short paths)
-      if (/cafe\.naver\.com\/?$/.test(href)) return;
-
-      seen.add(normalized);
-      cafeRank++;
-
-      if (foundRank === null && linksMatch(href, resolvedLink)) {
-        foundRank = cafeRank;
-        // Try to grab surrounding text as stats
-        const $parent = $(linkEl).closest("li, .bx, article, [class*='item'], [class*='result']");
-        if ($parent.length) {
-          const statsText = $parent
-            .find(".etc_dsc_area, .sub_txt, .ldate, .txt_inline, [class*='info'], [class*='stats'], [class*='date']")
-            .map((_, el) => $(el).text().trim())
-            .get()
-            .filter(Boolean)
-            .join(" ");
-          if (statsText) postStats = statsText;
+        rank++;
+        if (foundRank === null && linksMatch(href, resolvedLink)) {
+          foundRank = rank;
+          const $parent = $(linkEl).closest("li, .bx, article, [class*='item']");
+          if ($parent.length) {
+            const txt = $parent
+              .find(".etc_dsc_area, .sub_txt, .ldate, [class*='date'], [class*='info']")
+              .map((_, el) => $(el).text().trim()).get().filter(Boolean).join(" ");
+            if (txt) postStats = txt;
+          }
         }
-      }
-    });
+      });
+    }
+
+    // 카페 섹션을 못 찾은 경우 전체 페이지에서 카페 링크만 검색 (fallback)
+    if (foundRank === null) {
+      let rank = 0;
+      const seen = new Set<string>();
+
+      $("a[href*='cafe.naver.com']").each((_, linkEl) => {
+        const href = $(linkEl).attr("href") || "";
+        const postId = extractCafePostId(href);
+        if (!postId) return;
+
+        const key = href.toLowerCase().replace(/^https?:\/\//, "").replace(/\/$/, "");
+        if (seen.has(key)) return;
+        seen.add(key);
+
+        rank++;
+        if (foundRank === null && linksMatch(href, resolvedLink)) {
+          foundRank = rank;
+        }
+      });
+    }
 
     if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
     return { rank: null, status: "not_exposed", postStats: null };
