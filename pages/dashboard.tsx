@@ -184,48 +184,48 @@ export default function DashboardPage() {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
         <h3 className="text-base font-semibold text-gray-900 mb-4">{title}</h3>
-        <form onSubmit={onSubmit} className="space-y-3">
+        <form onSubmit={onSubmit} className="space-y-3" autoComplete="off">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">카페 링크 *</label>
-              <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input value={form.link} onChange={(e) => setForm((p) => ({ ...p, link: e.target.value }))}
+                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="https://cafe.naver.com/... 또는 naver.me/..." required />
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">검색 키워드 *</label>
-              <input value={form.keyword} onChange={(e) => setForm({ ...form, keyword: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input value={form.keyword} onChange={(e) => setForm((p) => ({ ...p, keyword: e.target.value }))}
+                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="네이버에서 검색할 키워드" required />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">브랜드</label>
-              <input value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input value={form.brand} onChange={(e) => setForm((p) => ({ ...p, brand: e.target.value }))}
+                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="브랜드명" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">제품명</label>
-              <input value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input value={form.productName} onChange={(e) => setForm((p) => ({ ...p, productName: e.target.value }))}
+                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="제품명" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">카페명</label>
-              <input value={form.cafeName} onChange={(e) => setForm({ ...form, cafeName: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input value={form.cafeName} onChange={(e) => setForm((p) => ({ ...p, cafeName: e.target.value }))}
+                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="카페명" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">담당자</label>
-              <input value={form.manager} onChange={(e) => setForm({ ...form, manager: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <input value={form.manager} onChange={(e) => setForm((p) => ({ ...p, manager: e.target.value }))}
+                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="담당자명" />
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">그룹</label>
-              <input value={form.group} onChange={(e) => setForm({ ...form, group: e.target.value })}
-                list="group-list"
+              <input value={form.group} onChange={(e) => setForm((p) => ({ ...p, group: e.target.value }))}
+                list="group-list" autoComplete="off"
                 className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="그룹명 (신규 입력 또는 선택)" />
               <datalist id="group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
