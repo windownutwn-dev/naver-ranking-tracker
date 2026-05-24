@@ -43,6 +43,8 @@ export default function DashboardPage() {
   const [formLoading, setFormLoading] = useState(false);
   const [notification, setNotification] = useState("");
   const [duplicateKeyword, setDuplicateKeyword] = useState<{ id: number; keyword: string } | null>(null);
+  const [bulkRefreshing, setBulkRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState<{ current: number; total: number } | null>(null);
   const [bulkRows, setBulkRows] = useState<any[]>([]);
   const [bulkPreview, setBulkPreview] = useState<{ total: number; newCount: number; duplicateCount: number; exposedDuplicateCount: number; duplicates: any[] } | null>(null);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -181,6 +183,22 @@ export default function DashboardPage() {
       body: JSON.stringify({ memo }),
     });
     fetchKeywords();
+  };
+
+  const handleBulkRefresh = async () => {
+    const targets = selected.length > 0 ? keywords.filter((k) => selected.includes(k.id)) : keywords;
+    if (!targets.length) return;
+    if (targets.length > 10 && !confirm(`${targets.length}개 키워드를 새로고침합니다. 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
+    setBulkRefreshing(true);
+    setRefreshProgress({ current: 0, total: targets.length });
+    for (let i = 0; i < targets.length; i++) {
+      setRefreshProgress({ current: i + 1, total: targets.length });
+      await fetch(`/api/keywords/refresh/${targets[i].id}`, { method: "POST" });
+    }
+    await fetchKeywords();
+    setBulkRefreshing(false);
+    setRefreshProgress(null);
+    showNotif(`${targets.length}개 키워드 새로고침 완료!`);
   };
 
   const handleBulkDelete = async () => {
@@ -354,6 +372,17 @@ export default function DashboardPage() {
                     {showDeleted ? "삭제된 키워드" : "키워드 목록"}{" "}
                     <span className="text-gray-400 font-normal text-sm">({keywords.length})</span>
                   </h3>
+                  <button onClick={handleBulkRefresh} disabled={bulkRefreshing}
+                    className="text-xs bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 disabled:opacity-50 flex items-center gap-1.5 font-medium">
+                    <svg className={`w-3.5 h-3.5 ${bulkRefreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {bulkRefreshing && refreshProgress
+                      ? `${refreshProgress.current}/${refreshProgress.total} 새로고침 중...`
+                      : selected.length > 0
+                      ? `선택 새로고침 (${selected.length})`
+                      : "일괄 새로고침"}
+                  </button>
                   {selected.length > 0 && (
                     <button onClick={handleBulkDelete}
                       className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-lg hover:bg-red-100">
@@ -401,7 +430,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="text-xs text-amber-700 bg-amber-50 px-4 py-2 border-b border-gray-100">
-                랭킹은 4시간마다 자동으로 업데이트됩니다. 수동 새로고침은 각 행의 새로고침 버튼을 클릭하세요.
+                랭킹은 4시간마다 자동으로 업데이트됩니다. 지금 바로 확인하려면 <strong>일괄 새로고침</strong> 버튼을 클릭하세요.
               </div>
 
               <div className="overflow-x-auto">
