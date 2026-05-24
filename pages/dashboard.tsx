@@ -1,24 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
-
-function KoreanInput({ value, onValueChange, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> & {
-  value: string;
-  onValueChange: (val: string) => void;
-}) {
-  const [local, setLocal] = useState(value);
-  const composing = useRef(false);
-  useEffect(() => { if (!composing.current) setLocal(value); }, [value]);
-  return (
-    <input
-      {...props}
-      value={local}
-      onChange={(e) => { setLocal(e.target.value); if (!composing.current) onValueChange(e.target.value); }}
-      onCompositionStart={() => { composing.current = true; }}
-      onCompositionEnd={(e) => { composing.current = false; const v = e.currentTarget.value; setLocal(v); onValueChange(v); }}
-    />
-  );
-}
 
 interface User { id: number; name: string; username: string; role: string; }
 interface Ranking { rank: number | null; status: string; postStats: string | null; checkedAt: string; }
@@ -39,6 +21,8 @@ const statusLabel = (r: Ranking | undefined) => {
   return <span className="text-gray-400 text-xs">-</span>;
 };
 
+const inputCls = "border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full";
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -50,10 +34,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState<number | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
   const [editKeyword, setEditKeyword] = useState<Keyword | null>(null);
-  const [form, setForm] = useState({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
-  const [formError, setFormError] = useState("");
+  const [addForm, setAddForm] = useState({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
+  const [editForm, setEditForm] = useState({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
+  const [addError, setAddError] = useState("");
+  const [editError, setEditError] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [notification, setNotification] = useState("");
 
@@ -90,16 +75,15 @@ export default function DashboardPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormLoading(true);
-    setFormError("");
+    setAddError("");
     const res = await fetch("/api/keywords", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(addForm),
     });
     const data = await res.json();
-    if (!res.ok) { setFormError(data.error); setFormLoading(false); return; }
-    setForm({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
-    setShowAddForm(false);
+    if (!res.ok) { setAddError(data.error); setFormLoading(false); return; }
+    setAddForm({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" });
     fetchKeywords();
     showNotif("키워드가 등록되었습니다.");
     setFormLoading(false);
@@ -109,12 +93,17 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!editKeyword) return;
     setFormLoading(true);
+    setEditError("");
     const res = await fetch(`/api/keywords/${editKeyword.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(editForm),
     });
-    if (res.ok) { setEditKeyword(null); fetchKeywords(); showNotif("수정되었습니다."); }
+    const data = await res.json();
+    if (!res.ok) { setEditError(data.error); setFormLoading(false); return; }
+    setEditKeyword(null);
+    fetchKeywords();
+    showNotif("수정되었습니다.");
     setFormLoading(false);
   };
 
@@ -135,8 +124,7 @@ export default function DashboardPage() {
 
   const handleToggleNotif = async (kw: Keyword) => {
     await fetch(`/api/keywords/${kw.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ notificationEnabled: !kw.notificationEnabled }),
     });
     fetchKeywords();
@@ -144,8 +132,7 @@ export default function DashboardPage() {
 
   const handleMemoUpdate = async (id: number, memo: string) => {
     await fetch(`/api/keywords/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memo }),
     });
     fetchKeywords();
@@ -172,23 +159,14 @@ export default function DashboardPage() {
     e.target.value = "";
   };
 
-  const toggleSelect = (id: number) => {
-    setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
-  };
-
-  const toggleSelectAll = () => {
-    if (selected.length === keywords.length) setSelected([]);
-    else setSelected(keywords.map((k) => k.id));
-  };
-
   const openEdit = (kw: Keyword) => {
     setEditKeyword(kw);
-    setForm({
+    setEditForm({
       link: kw.link, keyword: kw.keyword, brand: kw.brand || "",
       productName: kw.productName || "", cafeName: kw.cafeName || "",
       manager: kw.manager || "", group: kw.group || "",
     });
-    setFormError("");
+    setEditError("");
   };
 
   const formatDate = (d: string) => {
@@ -197,73 +175,6 @@ export default function DashboardPage() {
   };
 
   if (!user) return <div className="min-h-screen flex items-center justify-center"><span className="text-gray-400">로딩 중...</span></div>;
-
-  const FormModal = ({ title, onSubmit }: { title: string; onSubmit: (e: React.FormEvent) => void }) => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
-        <h3 className="text-base font-semibold text-gray-900 mb-4">{title}</h3>
-        <form onSubmit={onSubmit} className="space-y-3" autoComplete="off">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">카페 링크 *</label>
-              <input value={form.link} onChange={(e) => setForm((p) => ({ ...p, link: e.target.value }))}
-                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="https://cafe.naver.com/... 또는 naver.me/..." required />
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">검색 키워드 *</label>
-              <KoreanInput value={form.keyword} onValueChange={(v) => setForm((p) => ({ ...p, keyword: v }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="네이버에서 검색할 키워드" required />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">브랜드</label>
-              <KoreanInput value={form.brand} onValueChange={(v) => setForm((p) => ({ ...p, brand: v }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="브랜드명" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">제품명</label>
-              <KoreanInput value={form.productName} onValueChange={(v) => setForm((p) => ({ ...p, productName: v }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="제품명" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">카페명</label>
-              <KoreanInput value={form.cafeName} onValueChange={(v) => setForm((p) => ({ ...p, cafeName: v }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="카페명" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-600">담당자</label>
-              <KoreanInput value={form.manager} onValueChange={(v) => setForm((p) => ({ ...p, manager: v }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="담당자명" />
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs font-medium text-gray-600">그룹</label>
-              <KoreanInput value={form.group} onValueChange={(v) => setForm((p) => ({ ...p, group: v }))}
-                list="group-list"
-                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="그룹명 (신규 입력 또는 선택)" />
-              <datalist id="group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
-            </div>
-          </div>
-          {formError && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{formError}</p>}
-          <div className="flex gap-2 pt-2">
-            <button type="button" onClick={() => { setShowAddForm(false); setEditKeyword(null); }}
-              className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
-              취소
-            </button>
-            <button type="submit" disabled={formLoading}
-              className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-              {formLoading ? "처리 중..." : title}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
 
   return (
     <>
@@ -276,26 +187,17 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-400 mt-0.5">순위 추적 솔루션</p>
           </div>
           <nav className="flex-1 p-2 space-y-1">
-            <a href="/dashboard"
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+            <a href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               키워드 추적
             </a>
-            <a href="/batch"
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <a href="/batch" className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               배치작업 설정
             </a>
             {user.role === "admin" && (
-              <a href="/admin"
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
+              <a href="/admin" className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 사용자 관리
               </a>
             )}
@@ -307,39 +209,61 @@ export default function DashboardPage() {
             </div>
             <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); router.push("/login"); }}
               className="text-gray-400 hover:text-white p-1 rounded" title="로그아웃">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
             </button>
           </div>
         </aside>
 
-        {/* Main content */}
+        {/* Main */}
         <main className="flex-1 overflow-auto">
           <div className="p-6 max-w-full">
-            <div className="mb-5">
+            <div className="mb-4">
               <h2 className="text-xl font-bold text-gray-900">키워드 추적</h2>
               <p className="text-sm text-gray-500">네이버 검색 카페 콘텐츠 블록 순위 추적</p>
             </div>
 
-            {/* Add form toggle */}
+            {/* Inline Add Form */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-              <button onClick={() => { setShowAddForm(true); setForm({ link: "", keyword: "", brand: "", productName: "", cafeName: "", manager: "", group: "" }); setFormError(""); }}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
-                + 키워드 등록
-              </button>
-              <span className="ml-3 text-sm text-gray-500">엑셀 일괄등록:</span>
-              <label className="ml-2 cursor-pointer bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors">
-                파일 선택
-                <input type="file" accept=".xlsx,.xls" onChange={handleExcelUpload} className="hidden" />
-              </label>
-              <a href="/api/keywords/excel?template=true"
-                className="ml-2 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors inline-block">
-                양식 다운로드
-              </a>
+              <form onSubmit={handleAdd}>
+                <div className="flex gap-2 mb-2">
+                  <input value={addForm.link} onChange={(e) => setAddForm((p) => ({ ...p, link: e.target.value }))}
+                    className={inputCls} placeholder="카페 링크 *" required />
+                  <input value={addForm.keyword} onChange={(e) => setAddForm((p) => ({ ...p, keyword: e.target.value }))}
+                    className={inputCls} placeholder="검색 키워드 *" required />
+                  <button type="submit" disabled={formLoading}
+                    className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+                    {formLoading ? "처리 중..." : "등록"}
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input value={addForm.brand} onChange={(e) => setAddForm((p) => ({ ...p, brand: e.target.value }))}
+                    className={inputCls} placeholder="브랜드" />
+                  <input value={addForm.productName} onChange={(e) => setAddForm((p) => ({ ...p, productName: e.target.value }))}
+                    className={inputCls} placeholder="제품명" />
+                  <input value={addForm.cafeName} onChange={(e) => setAddForm((p) => ({ ...p, cafeName: e.target.value }))}
+                    className={inputCls} placeholder="카페명" />
+                  <input value={addForm.manager} onChange={(e) => setAddForm((p) => ({ ...p, manager: e.target.value }))}
+                    className={inputCls} placeholder="담당자" />
+                  <input value={addForm.group} onChange={(e) => setAddForm((p) => ({ ...p, group: e.target.value }))}
+                    list="group-list" className={inputCls} placeholder="그룹" />
+                  <datalist id="group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
+                </div>
+                {addError && <p className="text-red-500 text-xs mt-2 bg-red-50 px-3 py-1.5 rounded-lg">{addError}</p>}
+              </form>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                <span className="text-sm text-gray-500">엑셀 일괄등록:</span>
+                <label className="cursor-pointer bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-700">
+                  파일 선택
+                  <input type="file" accept=".xlsx,.xls" onChange={handleExcelUpload} className="hidden" />
+                </label>
+                <a href="/api/keywords/excel?template=true"
+                  className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50 inline-block">
+                  양식 다운로드
+                </a>
+              </div>
             </div>
 
-            {/* List header */}
+            {/* List */}
             <div className="bg-white rounded-xl border border-gray-200">
               <div className="flex items-center justify-between p-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
@@ -359,11 +283,9 @@ export default function DashboardPage() {
                     className="text-xs border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50">
                     {showDeleted ? "목록으로" : "삭제 기록"}
                   </button>
-                  <a href="/api/keywords/excel"
-                    className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700">
+                  <a href="/api/keywords/excel" className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700">
                     엑셀 다운로드
                   </a>
-                  {/* Filters */}
                   <select value={filters.group} onChange={(e) => setFilters({ ...filters, group: e.target.value })}
                     className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
                     <option>전체 그룹</option>
@@ -395,19 +317,19 @@ export default function DashboardPage() {
                 랭킹은 4시간마다 자동으로 업데이트됩니다. 수동 새로고침은 각 행의 새로고침 버튼을 클릭하세요.
               </div>
 
-              {/* Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-xs text-gray-500 border-b border-gray-100">
                       <th className="pl-4 py-3 w-8">
                         <input type="checkbox" checked={selected.length === keywords.length && keywords.length > 0}
-                          onChange={toggleSelectAll} className="rounded" />
+                          onChange={() => { if (selected.length === keywords.length) setSelected([]); else setSelected(keywords.map((k) => k.id)); }}
+                          className="rounded" />
                       </th>
                       <th className="py-3 w-8 text-left">#</th>
                       <th className="py-3 text-left font-medium">키워드</th>
                       <th className="py-3 text-left font-medium w-20">랭킹</th>
-                      <th className="py-3 text-left font-medium w-20">인기글</th>
+                      <th className="py-3 text-left font-medium w-20">알림</th>
                       <th className="py-3 text-left font-medium w-32">게시글</th>
                       <th className="py-3 text-left font-medium w-24">그룹</th>
                       <th className="py-3 text-left font-medium w-32">확인일시</th>
@@ -426,7 +348,8 @@ export default function DashboardPage() {
                         <tr key={kw.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                           <td className="pl-4 py-3">
                             <input type="checkbox" checked={selected.includes(kw.id)}
-                              onChange={() => toggleSelect(kw.id)} className="rounded" />
+                              onChange={() => setSelected((p) => p.includes(kw.id) ? p.filter((x) => x !== kw.id) : [...p, kw.id])}
+                              className="rounded" />
                           </td>
                           <td className="py-3 text-gray-400 text-xs">{idx + 1}</td>
                           <td className="py-3">
@@ -454,12 +377,10 @@ export default function DashboardPage() {
                           </td>
                           <td className="py-3 text-xs text-gray-500">{latest ? formatDate(latest.checkedAt) : "-"}</td>
                           <td className="py-3">
-                            <input
-                              defaultValue={kw.memo || ""}
+                            <input defaultValue={kw.memo || ""}
                               onBlur={(e) => { if (e.target.value !== kw.memo) handleMemoUpdate(kw.id, e.target.value); }}
                               className="text-xs text-gray-500 border-0 bg-transparent focus:outline-none focus:bg-gray-100 rounded px-1 py-0.5 w-24 placeholder-gray-300"
-                              placeholder="메모 입력"
-                            />
+                              placeholder="메모 입력" />
                           </td>
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-1 justify-end">
@@ -492,11 +413,67 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      {/* Modals */}
-      {showAddForm && <FormModal title="등록" onSubmit={handleAdd} />}
-      {editKeyword && <FormModal title="수정" onSubmit={handleEdit} />}
+      {/* Edit Modal */}
+      {editKeyword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-4">수정</h3>
+            <form onSubmit={handleEdit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-600">카페 링크 *</label>
+                  <input value={editForm.link} onChange={(e) => setEditForm((p) => ({ ...p, link: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="https://cafe.naver.com/... 또는 naver.me/..." required />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-600">검색 키워드 *</label>
+                  <input value={editForm.keyword} onChange={(e) => setEditForm((p) => ({ ...p, keyword: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="네이버에서 검색할 키워드" required />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">브랜드</label>
+                  <input value={editForm.brand} onChange={(e) => setEditForm((p) => ({ ...p, brand: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="브랜드명" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">제품명</label>
+                  <input value={editForm.productName} onChange={(e) => setEditForm((p) => ({ ...p, productName: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="제품명" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">카페명</label>
+                  <input value={editForm.cafeName} onChange={(e) => setEditForm((p) => ({ ...p, cafeName: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="카페명" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600">담당자</label>
+                  <input value={editForm.manager} onChange={(e) => setEditForm((p) => ({ ...p, manager: e.target.value }))}
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="담당자명" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-medium text-gray-600">그룹</label>
+                  <input value={editForm.group} onChange={(e) => setEditForm((p) => ({ ...p, group: e.target.value }))}
+                    list="edit-group-list"
+                    className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="그룹명" />
+                  <datalist id="edit-group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
+                </div>
+              </div>
+              {editError && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{editError}</p>}
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setEditKeyword(null)}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">취소</button>
+                <button type="submit" disabled={formLoading}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {formLoading ? "처리 중..." : "수정"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-      {/* Notification */}
       {notification && (
         <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm shadow-lg z-50">
           {notification}
