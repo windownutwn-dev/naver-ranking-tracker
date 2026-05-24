@@ -64,6 +64,16 @@ const CAFE_SECTION_SELECTORS = [
   '[class*="cafe_wrap"]',
 ];
 
+// 이미지 클러스터 컨테이너 클래스 패턴 (카페 섹션 내 이미지 박스 - 텍스트 순위에서 제외)
+const IMAGE_CLUSTER_PATTERN = /cluster_photo|lst_image|image_lst|photo_area|img_lst|cluster_img|thumb_area|img_area|cluster_tit|view_img/i;
+
+function isInsideImageCluster($: cheerio.CheerioAPI, el: any): boolean {
+  return $(el).parents().toArray().some((parent) => {
+    const cls = $(parent).attr("class") || "";
+    return IMAGE_CLUSTER_PATTERN.test(cls);
+  });
+}
+
 function rankInRoot($: cheerio.CheerioAPI, root: cheerio.Cheerio<any>, resolvedLink: string) {
   let foundRank: number | null = null;
   let postStats: string | null = null;
@@ -74,6 +84,9 @@ function rankInRoot($: cheerio.CheerioAPI, root: cheerio.Cheerio<any>, resolvedL
     const href = $(linkEl).attr("href") || "";
     const postId = extractCafePostId(href);
     if (!postId) return; // 게시글 링크가 아닌 카페 홈/이름 링크 제외
+
+    // 이미지 클러스터 안의 링크는 순위 카운트에서 제외
+    if (isInsideImageCluster($, linkEl)) return;
 
     if (seenIds.has(postId)) return; // 같은 게시글 ID는 한 번만 카운트
     seenIds.add(postId);
