@@ -1,6 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
+
+function KoreanInput({ value, onValueChange, ...props }: Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> & {
+  value: string;
+  onValueChange: (val: string) => void;
+}) {
+  const [local, setLocal] = useState(value);
+  const composing = useRef(false);
+  useEffect(() => { if (!composing.current) setLocal(value); }, [value]);
+  return (
+    <input
+      {...props}
+      value={local}
+      onChange={(e) => { setLocal(e.target.value); if (!composing.current) onValueChange(e.target.value); }}
+      onCompositionStart={() => { composing.current = true; }}
+      onCompositionEnd={(e) => { composing.current = false; const v = e.currentTarget.value; setLocal(v); onValueChange(v); }}
+    />
+  );
+}
 
 interface User { id: number; name: string; username: string; role: string; }
 interface Ranking { rank: number | null; status: string; postStats: string | null; checkedAt: string; }
@@ -194,38 +212,38 @@ export default function DashboardPage() {
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">검색 키워드 *</label>
-              <input value={form.keyword} onChange={(e) => setForm((p) => ({ ...p, keyword: e.target.value }))}
-                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <KoreanInput value={form.keyword} onValueChange={(v) => setForm((p) => ({ ...p, keyword: v }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="네이버에서 검색할 키워드" required />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">브랜드</label>
-              <input value={form.brand} onChange={(e) => setForm((p) => ({ ...p, brand: e.target.value }))}
-                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <KoreanInput value={form.brand} onValueChange={(v) => setForm((p) => ({ ...p, brand: v }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="브랜드명" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">제품명</label>
-              <input value={form.productName} onChange={(e) => setForm((p) => ({ ...p, productName: e.target.value }))}
-                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <KoreanInput value={form.productName} onValueChange={(v) => setForm((p) => ({ ...p, productName: v }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="제품명" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">카페명</label>
-              <input value={form.cafeName} onChange={(e) => setForm((p) => ({ ...p, cafeName: e.target.value }))}
-                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <KoreanInput value={form.cafeName} onValueChange={(v) => setForm((p) => ({ ...p, cafeName: v }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="카페명" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600">담당자</label>
-              <input value={form.manager} onChange={(e) => setForm((p) => ({ ...p, manager: e.target.value }))}
-                autoComplete="off" className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <KoreanInput value={form.manager} onValueChange={(v) => setForm((p) => ({ ...p, manager: v }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="담당자명" />
             </div>
             <div className="col-span-2">
               <label className="text-xs font-medium text-gray-600">그룹</label>
-              <input value={form.group} onChange={(e) => setForm((p) => ({ ...p, group: e.target.value }))}
-                list="group-list" autoComplete="off"
+              <KoreanInput value={form.group} onValueChange={(v) => setForm((p) => ({ ...p, group: v }))}
+                list="group-list"
                 className="w-full border rounded-lg px-3 py-2 text-sm mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="그룹명 (신규 입력 또는 선택)" />
               <datalist id="group-list">{groups.map((g) => <option key={g} value={g || ""} />)}</datalist>
