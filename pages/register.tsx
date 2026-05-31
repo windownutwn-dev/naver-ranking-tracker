@@ -2,7 +2,8 @@ import { useState } from "react";
 import Head from "next/head";
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ name: "", username: "", password: "", brand: "" });
+  const [form, setForm] = useState({ name: "", username: "", password: "", brandInput: "" });
+  const [brands, setBrands] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,12 +17,13 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, brands }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
       setSuccess(data.message);
-      setForm({ name: "", username: "", password: "", brand: "" });
+      setForm({ name: "", username: "", password: "", brandInput: "" });
+      setBrands([]);
     } catch {
       setError("서버 오류가 발생했습니다.");
     } finally {
@@ -84,15 +86,38 @@ export default function RegisterPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">브랜드 <span className="text-gray-400 font-normal">(선택)</span></label>
-                <input
-                  type="text"
-                  value={form.brand}
-                  onChange={(e) => setForm({ ...form, brand: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="담당 브랜드명 입력"
-                />
-                <p className="text-xs text-gray-400 mt-1">입력한 브랜드의 키워드만 볼 수 있습니다</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">브랜드 <span className="text-gray-400 font-normal">(선택, 복수 가능)</span></label>
+                <div className="flex gap-1 mb-1 flex-wrap">
+                  {brands.map((b) => (
+                    <span key={b} className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                      {b}
+                      <button type="button" onClick={() => setBrands(brands.filter((x) => x !== b))} className="hover:text-red-500">×</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={form.brandInput}
+                    onChange={(e) => setForm({ ...form, brandInput: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const v = form.brandInput.trim();
+                        if (v && !brands.includes(v)) setBrands([...brands, v]);
+                        setForm({ ...form, brandInput: "" });
+                      }
+                    }}
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="브랜드명 입력 후 Enter"
+                  />
+                  <button type="button" onClick={() => {
+                    const v = form.brandInput.trim();
+                    if (v && !brands.includes(v)) setBrands([...brands, v]);
+                    setForm({ ...form, brandInput: "" });
+                  }} className="border border-gray-300 rounded-lg px-3 py-2 text-sm hover:bg-gray-50">추가</button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">지정된 브랜드의 키워드만 볼 수 있습니다</p>
               </div>
 
               {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}

@@ -11,8 +11,8 @@ export default withAuth(async (req, res, user) => {
     };
 
     if (user.role !== "admin") {
-      if (user.brand) {
-        where.brand = user.brand;
+      if (user.brands && user.brands.length > 0) {
+        where.brand = { in: user.brands };
       } else {
         where.userId = user.id;
       }
@@ -41,7 +41,7 @@ export default withAuth(async (req, res, user) => {
     }
 
     const allKeywords = await prisma.keyword.findMany({
-      where: user.role === "admin" ? { deletedAt: null } : user.brand ? { brand: user.brand, deletedAt: null } : { userId: user.id, deletedAt: null },
+      where: user.role === "admin" ? { deletedAt: null } : (user.brands?.length > 0) ? { brand: { in: user.brands }, deletedAt: null } : { userId: user.id, deletedAt: null },
       select: { brand: true, cafeName: true, productName: true, manager: true },
     });
 

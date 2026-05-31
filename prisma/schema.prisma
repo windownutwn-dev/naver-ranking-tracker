@@ -12,7 +12,7 @@ model User {
   username  String    @unique
   password  String
   role      String    @default("user")
-  brand     String?
+  brands    String[]
   approved  Boolean   @default(false)
   createdAt DateTime  @default(now())
   keywords  Keyword[]

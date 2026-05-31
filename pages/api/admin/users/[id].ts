@@ -7,15 +7,15 @@ export default withAdmin(async (req, res) => {
   if (isNaN(id)) return res.status(400).json({ error: "잘못된 ID입니다." });
 
   if (req.method === "PATCH") {
-    const { approved, role, brand } = req.body;
+    const { approved, role, brands } = req.body;
     const updated = await prisma.user.update({
       where: { id },
       data: {
         ...(approved !== undefined ? { approved } : {}),
         ...(role !== undefined ? { role } : {}),
-        ...(brand !== undefined ? { brand: brand || null } : {}),
+        ...(brands !== undefined ? { brands: Array.isArray(brands) ? brands : [] } : {}),
       },
-      select: { id: true, name: true, username: true, role: true, approved: true, brand: true },
+      select: { id: true, name: true, username: true, role: true, approved: true, brands: true },
     });
     return res.status(200).json({ user: updated });
   }

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 
-interface User { id: number; name: string; username: string; role: string; brand: string | null; approved: boolean; createdAt: string; _count: { keywords: number }; }
+interface User { id: number; name: string; username: string; role: string; brands: string[]; approved: boolean; createdAt: string; _count: { keywords: number }; }
 interface Me { id: number; name: string; username: string; role: string; }
 
 export default function AdminPage() {
@@ -11,11 +11,12 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [createForm, setCreateForm] = useState({ name: "", username: "", password: "", role: "user", brand: "" });
+  const [createForm, setCreateForm] = useState({ name: "", username: "", password: "", role: "user", brandInput: "" });
+  const [createBrands, setCreateBrands] = useState<string[]>([]);
   const [createError, setCreateError] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editBrand, setEditBrand] = useState<{ [id: number]: string }>({});
+  const [editBrandInput, setEditBrandInput] = useState<{ [id: number]: string }>({});
 
   const showMsg = (msg: string) => { setMessage(msg); setTimeout(() => setMessage(""), 3000); };
 
@@ -32,9 +33,9 @@ export default function AdminPage() {
     if (res.ok) {
       const d = await res.json();
       setUsers(d.users);
-      const brands: { [id: number]: string } = {};
-      d.users.forEach((u: User) => { brands[u.id] = u.brand || ""; });
-      setEditBrand(brands);
+      const inputs: { [id: number]: string } = {};
+      d.users.forEach((u: User) => { inputs[u.id] = ""; });
+      setEditBrandInput(inputs);
     }
     setLoading(false);
   };
@@ -61,14 +62,29 @@ export default function AdminPage() {
     showMsg("권한이 변경되었습니다.");
   };
 
-  const handleBrandChange = async (id: number) => {
+  const handleAddBrand = async (id: number, currentBrands: string[]) => {
+    const v = (editBrandInput[id] || "").trim();
+    if (!v || currentBrands.includes(v)) { setEditBrandInput((p) => ({ ...p, [id]: "" })); return; }
+    const newBrands = [...currentBrands, v];
     await fetch(`/api/admin/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ brand: editBrand[id] || "" }),
+      body: JSON.stringify({ brands: newBrands }),
+    });
+    setEditBrandInput((p) => ({ ...p, [id]: "" }));
+    fetchUsers();
+    showMsg("브랜드가 추가되었습니다.");
+  };
+
+  const handleRemoveBrand = async (id: number, currentBrands: string[], brand: string) => {
+    const newBrands = currentBrands.filter((b) => b !== brand);
+    await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brands: newBrands }),
     });
     fetchUsers();
-    showMsg("브랜드가 변경되었습니다.");
+    showMsg("브랜드가 제거되었습니다.");
   };
 
   const handleDelete = async (id: number) => {
@@ -85,11 +101,12 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(createForm),
+      body: JSON.stringify({ ...createForm, brands: createBrands }),
     });
     const data = await res.json();
     if (!res.ok) { setCreateError(data.error); setCreateLoading(false); return; }
-    setCreateForm({ name: "", username: "", password: "", role: "user", brand: "" });
+    setCreateForm({ name: "", username: "", password: "", role: "user", brandInput: "" });
+    setCreateBrands([]);
     setShowCreateForm(false);
     fetchUsers();
     showMsg(`${data.user.name} 계정이 생성되었습니다.`);
@@ -163,8 +180,21 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">브랜드</label>
-                  <input value={createForm.brand} onChange={(e) => setCreateForm((p) => ({ ...p, brand: e.target.value }))}
-                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-32" placeholder="브랜드명" />
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    {createBrands.map((b) => (
+                      <span key={b} className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
+                        {b}<button type="button" onClick={() => setCreateBrands(createBrands.filter((x) => x !== b))} className="hover:text-red-500">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-1">
+                    <input value={createForm.brandInput}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, brandInput: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = createForm.brandInput.trim(); if (v && !createBrands.includes(v)) setCreateBrands([...createBrands, v]); setCreateForm((p) => ({ ...p, brandInput: "" })); } }}
+                      className="border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-24" placeholder="입력 후 Enter" />
+                    <button type="button" onClick={() => { const v = createForm.brandInput.trim(); if (v && !createBrands.includes(v)) setCreateBrands([...createBrands, v]); setCreateForm((p) => ({ ...p, brandInput: "" })); }}
+                      className="border border-gray-300 rounded-lg px-2 py-1 text-xs hover:bg-gray-50">+</button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">권한</label>
@@ -219,15 +249,26 @@ export default function AdminPage() {
                       <td className="px-4 py-3 text-gray-600">{u.username}</td>
                       <td className="px-4 py-3">
                         {u.id !== me.id ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              value={editBrand[u.id] ?? ""}
-                              onChange={(e) => setEditBrand((p) => ({ ...p, [u.id]: e.target.value }))}
-                              onBlur={() => handleBrandChange(u.id)}
-                              onKeyDown={(e) => e.key === "Enter" && handleBrandChange(u.id)}
-                              className="text-xs border border-gray-200 rounded px-2 py-1 w-28 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              placeholder="브랜드 없음"
-                            />
+                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-wrap gap-1">
+                              {(u.brands || []).map((b) => (
+                                <span key={b} className="bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                  {b}
+                                  <button type="button" onClick={() => handleRemoveBrand(u.id, u.brands, b)} className="hover:text-red-500 leading-none">×</button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex gap-1">
+                              <input
+                                value={editBrandInput[u.id] ?? ""}
+                                onChange={(e) => setEditBrandInput((p) => ({ ...p, [u.id]: e.target.value }))}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddBrand(u.id, u.brands); } }}
+                                className="text-xs border border-gray-200 rounded px-2 py-1 w-24 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="추가 후 Enter"
+                              />
+                              <button type="button" onClick={() => handleAddBrand(u.id, u.brands)}
+                                className="text-xs border border-gray-200 rounded px-2 py-1 hover:bg-gray-100">+</button>
+                            </div>
                           </div>
                         ) : (
                           <span className="text-xs text-gray-400">-</span>
