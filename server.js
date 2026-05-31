@@ -10,6 +10,8 @@ const handle = app.getRequestHandler();
 const PORT = process.env.PORT || 3000;
 
 app.prepare().then(() => {
+  console.log(`> Next.js 준비 완료 (NODE_ENV=${process.env.NODE_ENV}, PORT=${PORT})`);
+
   // Every 4 hours: 0 */4 * * *
   cron.schedule("0 */4 * * *", async () => {
     console.log("[Scheduler] 배치 작업 시작...");
@@ -33,4 +35,7 @@ app.prepare().then(() => {
     console.log(`> 서버 실행 중: http://localhost:${PORT}`);
     console.log("> 4시간마다 자동 랭킹 체크 활성화");
   });
+}).catch((err) => {
+  console.error("> 서버 시작 실패:", err);
+  process.exit(1);
 });
