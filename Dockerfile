@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
-RUN npm ci
+RUN NODE_ENV=development npm ci
 
 RUN npx prisma generate
 
