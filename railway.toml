@@ -2,6 +2,6 @@
 builder = "dockerfile"
 
 [deploy]
-startCommand = "npx prisma migrate deploy && npx tsx scripts/deploy-init.ts && node server.js"
+startCommand = "npx prisma migrate resolve --rolled-back 20260524102433_init || true && npx prisma migrate deploy && npx tsx scripts/deploy-init.ts && node server.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
