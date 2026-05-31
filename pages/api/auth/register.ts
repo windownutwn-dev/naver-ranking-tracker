@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).end();
 
-  const { name, username, password } = req.body;
+  const { name, username, password, brand } = req.body;
   if (!name || !username || !password) {
     return res.status(400).json({ error: "모든 필드를 입력해주세요." });
   }
@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const hashed = await bcrypt.hash(password, 10);
   await prisma.user.create({
-    data: { name, username, password: hashed, approved: false, role: "user" },
+    data: { name, username, password: hashed, approved: false, role: "user", brand: brand || null },
   });
 
   return res.status(201).json({ message: "회원가입이 완료되었습니다. 관리자 승인 후 이용 가능합니다." });

@@ -8,7 +8,7 @@ export default withAdmin(async (req, res) => {
     const users = await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       select: {
-        id: true, name: true, username: true, role: true, approved: true, createdAt: true,
+        id: true, name: true, username: true, role: true, approved: true, brand: true, createdAt: true,
         _count: { select: { keywords: true } },
       },
     });
@@ -16,7 +16,7 @@ export default withAdmin(async (req, res) => {
   }
 
   if (req.method === "POST") {
-    const { name, username, password, role } = req.body;
+    const { name, username, password, role, brand } = req.body;
     if (!name || !username || !password) {
       return res.status(400).json({ error: "이름, 아이디, 비밀번호는 필수입니다." });
     }
@@ -28,7 +28,7 @@ export default withAdmin(async (req, res) => {
 
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
-      data: { name, username, password: hashed, approved: true, role: role === "admin" ? "admin" : "user" },
+      data: { name, username, password: hashed, approved: true, role: role === "admin" ? "admin" : "user", brand: brand || null },
     });
     return res.status(201).json({ user: { id: user.id, name: user.name, username: user.username } });
   }

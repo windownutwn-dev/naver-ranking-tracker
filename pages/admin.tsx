@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 
-interface User { id: number; name: string; username: string; role: string; approved: boolean; createdAt: string; _count: { keywords: number }; }
+interface User { id: number; name: string; username: string; role: string; brand: string | null; approved: boolean; createdAt: string; _count: { keywords: number }; }
 interface Me { id: number; name: string; username: string; role: string; }
 
 export default function AdminPage() {
@@ -11,10 +11,11 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [createForm, setCreateForm] = useState({ name: "", username: "", password: "", role: "user" });
+  const [createForm, setCreateForm] = useState({ name: "", username: "", password: "", role: "user", brand: "" });
   const [createError, setCreateError] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editBrand, setEditBrand] = useState<{ [id: number]: string }>({});
 
   const showMsg = (msg: string) => { setMessage(msg); setTimeout(() => setMessage(""), 3000); };
 
@@ -28,7 +29,13 @@ export default function AdminPage() {
   const fetchUsers = async () => {
     setLoading(true);
     const res = await fetch("/api/admin/users");
-    if (res.ok) { const d = await res.json(); setUsers(d.users); }
+    if (res.ok) {
+      const d = await res.json();
+      setUsers(d.users);
+      const brands: { [id: number]: string } = {};
+      d.users.forEach((u: User) => { brands[u.id] = u.brand || ""; });
+      setEditBrand(brands);
+    }
     setLoading(false);
   };
 
@@ -54,6 +61,16 @@ export default function AdminPage() {
     showMsg("권한이 변경되었습니다.");
   };
 
+  const handleBrandChange = async (id: number) => {
+    await fetch(`/api/admin/users/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brand: editBrand[id] || "" }),
+    });
+    fetchUsers();
+    showMsg("브랜드가 변경되었습니다.");
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm("이 사용자와 모든 키워드를 삭제하시겠습니까?")) return;
     await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
@@ -72,7 +89,7 @@ export default function AdminPage() {
     });
     const data = await res.json();
     if (!res.ok) { setCreateError(data.error); setCreateLoading(false); return; }
-    setCreateForm({ name: "", username: "", password: "", role: "user" });
+    setCreateForm({ name: "", username: "", password: "", role: "user", brand: "" });
     setShowCreateForm(false);
     fetchUsers();
     showMsg(`${data.user.name} 계정이 생성되었습니다.`);
@@ -117,7 +134,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-1">사용자 관리</h2>
-              <p className="text-sm text-gray-500">회원가입 승인 및 권한 관리</p>
+              <p className="text-sm text-gray-500">회원가입 승인 및 브랜드 권한 관리</p>
             </div>
             <button onClick={() => setShowCreateForm(!showCreateForm)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
@@ -143,6 +160,11 @@ export default function AdminPage() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">비밀번호</label>
                   <input type="text" value={createForm.password} onChange={(e) => setCreateForm((p) => ({ ...p, password: e.target.value }))}
                     className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28" placeholder="4자 이상" required autoComplete="off" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">브랜드</label>
+                  <input value={createForm.brand} onChange={(e) => setCreateForm((p) => ({ ...p, brand: e.target.value }))}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-32" placeholder="브랜드명" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">권한</label>
@@ -182,6 +204,7 @@ export default function AdminPage() {
                   <tr className="text-xs text-gray-500 border-b border-gray-100">
                     <th className="px-4 py-3 text-left font-medium">이름</th>
                     <th className="px-4 py-3 text-left font-medium">아이디</th>
+                    <th className="px-4 py-3 text-left font-medium">브랜드</th>
                     <th className="px-4 py-3 text-left font-medium">키워드 수</th>
                     <th className="px-4 py-3 text-left font-medium">가입일</th>
                     <th className="px-4 py-3 text-left font-medium">상태</th>
@@ -194,6 +217,22 @@ export default function AdminPage() {
                     <tr key={u.id} className={`border-b border-gray-50 hover:bg-gray-50 ${!u.approved ? "bg-amber-50/50" : ""}`}>
                       <td className="px-4 py-3 font-medium text-gray-900">{u.name}</td>
                       <td className="px-4 py-3 text-gray-600">{u.username}</td>
+                      <td className="px-4 py-3">
+                        {u.id !== me.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              value={editBrand[u.id] ?? ""}
+                              onChange={(e) => setEditBrand((p) => ({ ...p, [u.id]: e.target.value }))}
+                              onBlur={() => handleBrandChange(u.id)}
+                              onKeyDown={(e) => e.key === "Enter" && handleBrandChange(u.id)}
+                              className="text-xs border border-gray-200 rounded px-2 py-1 w-28 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              placeholder="브랜드 없음"
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-gray-600">{u._count.keywords}개</td>
                       <td className="px-4 py-3 text-gray-500 text-xs">
                         {new Date(u.createdAt).toLocaleDateString("ko-KR")}

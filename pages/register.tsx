@@ -2,7 +2,7 @@ import { useState } from "react";
 import Head from "next/head";
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ name: "", username: "", password: "" });
+  const [form, setForm] = useState({ name: "", username: "", password: "", brand: "" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ export default function RegisterPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error); return; }
       setSuccess(data.message);
-      setForm({ name: "", username: "", password: "" });
+      setForm({ name: "", username: "", password: "", brand: "" });
     } catch {
       setError("서버 오류가 발생했습니다.");
     } finally {
@@ -82,6 +82,17 @@ export default function RegisterPage() {
                   placeholder="4자 이상"
                   required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">브랜드 <span className="text-gray-400 font-normal">(선택)</span></label>
+                <input
+                  type="text"
+                  value={form.brand}
+                  onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="담당 브랜드명 입력"
+                />
+                <p className="text-xs text-gray-400 mt-1">입력한 브랜드의 키워드만 볼 수 있습니다</p>
               </div>
 
               {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}

@@ -10,7 +10,13 @@ export default withAuth(async (req, res, user) => {
       deletedAt: deleted === "true" ? { not: null } : null,
     };
 
-    if (user.role !== "admin") where.userId = user.id;
+    if (user.role !== "admin") {
+      if (user.brand) {
+        where.brand = user.brand;
+      } else {
+        where.userId = user.id;
+      }
+    }
     if (brand && brand !== "전체") where.brand = brand;
     if (cafeName && cafeName !== "전체") where.cafeName = cafeName;
     if (productName && productName !== "전체") where.productName = productName;
@@ -35,7 +41,7 @@ export default withAuth(async (req, res, user) => {
     }
 
     const allKeywords = await prisma.keyword.findMany({
-      where: user.role === "admin" ? { deletedAt: null } : { userId: user.id, deletedAt: null },
+      where: user.role === "admin" ? { deletedAt: null } : user.brand ? { brand: user.brand, deletedAt: null } : { userId: user.id, deletedAt: null },
       select: { brand: true, cafeName: true, productName: true, manager: true },
     });
 
