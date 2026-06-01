@@ -9,23 +9,23 @@ export default withAdmin(async (req, res) => {
   }
 
   if (req.method === "PUT") {
-    const { enabled, intervalHours } = req.body;
+    const { enabled, intervalHours, telegramEnabled, telegramToken, telegramChatId } = req.body;
     const now = new Date();
     const nextRun = new Date(now.getTime() + (intervalHours || 4) * 60 * 60 * 1000);
 
+    const data: any = {
+      enabled: enabled ?? true,
+      intervalHours: intervalHours || 4,
+      nextRunAt: nextRun,
+    };
+    if (telegramEnabled !== undefined) data.telegramEnabled = telegramEnabled;
+    if (telegramToken !== undefined) data.telegramToken = telegramToken || null;
+    if (telegramChatId !== undefined) data.telegramChatId = telegramChatId || null;
+
     const setting = await prisma.batchSetting.upsert({
       where: { id: 1 },
-      update: {
-        enabled: enabled ?? true,
-        intervalHours: intervalHours || 4,
-        nextRunAt: nextRun,
-      },
-      create: {
-        id: 1,
-        enabled: enabled ?? true,
-        intervalHours: intervalHours || 4,
-        nextRunAt: nextRun,
-      },
+      update: data,
+      create: { id: 1, ...data },
     });
     return res.status(200).json({ setting });
   }

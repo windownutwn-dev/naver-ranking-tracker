@@ -2,14 +2,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 
-interface BatchSetting { enabled: boolean; intervalHours: number; lastRunAt: string | null; nextRunAt: string | null; }
+interface BatchSetting { enabled: boolean; intervalHours: number; lastRunAt: string | null; nextRunAt: string | null; telegramEnabled: boolean; telegramToken: string | null; telegramChatId: string | null; }
 interface User { id: number; name: string; username: string; role: string; }
 
 export default function BatchPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [setting, setSetting] = useState<BatchSetting | null>(null);
-  const [form, setForm] = useState({ enabled: true, intervalHours: 4 });
+  const [form, setForm] = useState({ enabled: true, intervalHours: 4, telegramEnabled: false, telegramToken: "", telegramChatId: "" });
+  const [testingTelegram, setTestingTelegram] = useState(false);
   const [loading, setLoading] = useState(false);
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState("");
@@ -24,7 +25,16 @@ export default function BatchPage() {
   useEffect(() => {
     if (user?.role === "admin") {
       fetch("/api/batch/settings").then((r) => r.json()).then((d) => {
-        if (d.setting) { setSetting(d.setting); setForm({ enabled: d.setting.enabled, intervalHours: d.setting.intervalHours }); }
+        if (d.setting) {
+        setSetting(d.setting);
+        setForm({
+          enabled: d.setting.enabled,
+          intervalHours: d.setting.intervalHours,
+          telegramEnabled: d.setting.telegramEnabled ?? false,
+          telegramToken: d.setting.telegramToken ?? "",
+          telegramChatId: d.setting.telegramChatId ?? "",
+        });
+      }
       });
     }
   }, [user]);
@@ -35,7 +45,13 @@ export default function BatchPage() {
     const res = await fetch("/api/batch/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        enabled: form.enabled,
+        intervalHours: form.intervalHours,
+        telegramEnabled: form.telegramEnabled,
+        telegramToken: form.telegramToken,
+        telegramChatId: form.telegramChatId,
+      }),
     });
     const data = await res.json();
     if (res.ok) { setSetting(data.setting); setMessage("설정이 저장되었습니다."); }
@@ -52,6 +68,19 @@ export default function BatchPage() {
     setRunning(false);
     // Refresh settings
     fetch("/api/batch/settings").then((r) => r.json()).then((d) => { if (d.setting) setSetting(d.setting); });
+  };
+
+  const handleTestTelegram = async () => {
+    if (!form.telegramToken || !form.telegramChatId) { setMessage("봇 토큰과 Chat ID를 먼저 입력하세요."); return; }
+    setTestingTelegram(true);
+    const res = await fetch("/api/telegram/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: form.telegramToken, chatId: form.telegramChatId }),
+    });
+    const data = await res.json();
+    setMessage(res.ok ? "✅ 텔레그램 테스트 메시지 발송 완료!" : `실패: ${data.error}`);
+    setTestingTelegram(false);
   };
 
   const formatDate = (d: string | null) =>
@@ -157,6 +186,56 @@ export default function BatchPage() {
                   {loading ? "저장 중..." : "설정 저장"}
                 </button>
               </form>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-6 mt-4">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-gray-900">텔레그램 알림 설정</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">09:00 / 18:00 비교 알림 · 신규 노출 즉시 알림</p>
+                </div>
+                <button type="button" onClick={() => setForm({ ...form, telegramEnabled: !form.telegramEnabled })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.telegramEnabled ? "bg-blue-600" : "bg-gray-200"}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.telegramEnabled ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+
+              {form.telegramEnabled && (
+                <div className="space-y-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700 space-y-1">
+                    <p><b>설정 방법:</b></p>
+                    <p>1. 텔레그램에서 <b>@BotFather</b> 검색 → /newbot → 봇 생성 → 토큰 복사</p>
+                    <p>2. 생성한 봇에게 메시지 전송 후, <b>@userinfobot</b> 에서 Chat ID 확인</p>
+                    <p>3. 그룹 채널은 Chat ID 앞에 <b>-100</b> 을 붙여야 합니다</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">봇 토큰</label>
+                    <input value={form.telegramToken} onChange={(e) => setForm({ ...form, telegramToken: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxyz" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Chat ID</label>
+                    <input value={form.telegramChatId} onChange={(e) => setForm({ ...form, telegramChatId: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="123456789" />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={handleTestTelegram} disabled={testingTelegram}
+                      className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50">
+                      {testingTelegram ? "전송 중..." : "테스트 메시지 전송"}
+                    </button>
+                    <button type="button" onClick={handleSave} disabled={loading}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                      {loading ? "저장 중..." : "저장"}
+                    </button>
+                  </div>
+                  <div className="border-t border-gray-100 pt-3 text-xs text-gray-500 space-y-1">
+                    <p>📅 <b>매일 09:00 / 18:00</b> — 전일 동시간 대비 노출 변동 알림</p>
+                    <p>🔔 <b>4시간 배치 실행 후</b> — 신규 노출된 키워드 즉시 알림</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>

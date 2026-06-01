@@ -48,10 +48,13 @@ model Ranking {
 }
 
 model BatchSetting {
-  id            Int       @id @default(1)
-  enabled       Boolean   @default(true)
-  intervalHours Int       @default(4)
-  lastRunAt     DateTime?
-  nextRunAt     DateTime?
-  updatedAt     DateTime  @updatedAt
+  id              Int       @id @default(1)
+  enabled         Boolean   @default(true)
+  intervalHours   Int       @default(4)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  updatedAt       DateTime  @updatedAt
+  telegramEnabled Boolean   @default(false)
+  telegramToken   String?
+  telegramChatId  String?
 }
