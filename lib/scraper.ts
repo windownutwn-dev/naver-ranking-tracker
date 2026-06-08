@@ -42,6 +42,13 @@ function extractCafePostId(url: string): string | null {
   if (m1) return m1[1];
   const m2 = url.match(/[?&]articleid=(\d+)/i);
   if (m2) return m2[1];
+  // iframe_url_utf8 형식 처리: articleid가 이중 URL인코딩된 경우
+  // 예: ?iframe_url_utf8=%2FArticleRead.nhn%253Farticleid%3D5009517
+  try {
+    const decoded = decodeURIComponent(decodeURIComponent(url));
+    const m3 = decoded.match(/[?&]articleid=(\d+)/i);
+    if (m3) return m3[1];
+  } catch { /* 디코딩 실패 무시 */ }
   return null;
 }
 
