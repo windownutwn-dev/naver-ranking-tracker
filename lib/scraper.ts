@@ -65,13 +65,17 @@ const CAFE_SECTION_SELECTORS = [
 ];
 
 // 카드 하단 "관련글(RE:)" 영역 셀렉터 - 이 안의 링크는 메인 노출이 아님
-// 타 업체 카드의 메인글 아래 작게 표기된 관련글은 노출로 집계하지 않음
+// 네이버 새 UI 분석 결과:
+//   - fds-ugc-afte: 관련글(타 카드에 표시된 우리 글) + RE: 댓글 영역
+//   - fds-content-list: RE: 댓글 리스트 영역
+// 메인 글은 이 두 컨테이너 밖에 있음
 const RELATED_POST_AREA = [
-  ".bx_etc",           // 네이버 카페 결과 카드 하단 관련글 영역
-  ".api_etc_area",     // API 기반 추가 항목 영역
-  ".detail_box_etc",   // 추가 상세 박스
-  "[class*='bx_etc']", // bx_etc 포함 클래스 변형
-  "[class*='etc_list']", // etc_list 포함 클래스 변형
+  "[class*='fds-ugc-afte']",      // 관련글/댓글 영역 (네이버 새 UI)
+  "[class*='fds-content-list']",  // RE: 댓글 리스트 (네이버 새 UI)
+  ".bx_etc",                       // 구 UI 관련글 영역
+  ".api_etc_area",
+  "[class*='bx_etc']",
+  "[class*='etc_list']",
 ].join(", ");
 
 // 네이버 새 구조: div.sc_new 섹션 단위로 카운트 (각 섹션 = 카페 카드 한 장)
