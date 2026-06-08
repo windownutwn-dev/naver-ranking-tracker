@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 import { withAuth } from "@/lib/auth";
+import { normalizeNaverCafeUrl } from "@/lib/scraper";
 
 export default withAuth(async (req, res, user) => {
   const id = parseInt(req.query.id as string);
@@ -17,7 +18,7 @@ export default withAuth(async (req, res, user) => {
     const updated = await prisma.keyword.update({
       where: { id },
       data: {
-        link: link ?? keyword.link,
+        link: link !== undefined ? normalizeNaverCafeUrl(link) : keyword.link,
         keyword: kw ?? keyword.keyword,
         brand: brand !== undefined ? brand : keyword.brand,
         productName: productName !== undefined ? productName : keyword.productName,

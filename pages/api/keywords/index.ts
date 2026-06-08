@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "@/lib/prisma";
 import { withAuth } from "@/lib/auth";
+import { normalizeNaverCafeUrl } from "@/lib/scraper";
 
 export default withAuth(async (req, res, user) => {
   if (req.method === "GET") {
@@ -75,7 +76,7 @@ export default withAuth(async (req, res, user) => {
     const created = await prisma.keyword.create({
       data: {
         userId: user.id,
-        link, keyword,
+        link: normalizeNaverCafeUrl(link), keyword,
         brand: brand || null,
         productName: productName || null,
         cafeName: cafeName || null,

@@ -37,6 +37,35 @@ async function checkIfDeleted(url: string): Promise<boolean> {
   }
 }
 
+// 다양한 네이버 카페 URL 형식을 cafe.naver.com/cafename/postid 형식으로 정규화
+export function normalizeNaverCafeUrl(url: string): string {
+  const trimmed = url.trim();
+  // 이미 깔끔한 형식이면 그대로
+  if (/cafe\.naver\.com\/[^/?#]+\/\d+/.test(trimmed)) return trimmed;
+
+  // 카페명 추출
+  const cafeMatch = trimmed.match(/cafe\.naver\.com\/([^/?#]+)/);
+  const cafeName = cafeMatch?.[1];
+
+  // articleid 추출 (직접 또는 이중 인코딩)
+  let articleId: string | null = null;
+  const m1 = trimmed.match(/[?&]articleid=(\d+)/i);
+  if (m1) articleId = m1[1];
+  if (!articleId) {
+    try {
+      const decoded = decodeURIComponent(decodeURIComponent(trimmed));
+      const m2 = decoded.match(/[?&]articleid=(\d+)/i);
+      if (m2) articleId = m2[1];
+    } catch { /* 무시 */ }
+  }
+
+  // 카페명과 articleId 모두 있으면 깔끔한 URL로 변환
+  if (cafeName && articleId && cafeName.toLowerCase() !== "articleread.nhn") {
+    return `https://cafe.naver.com/${cafeName}/${articleId}`;
+  }
+  return trimmed;
+}
+
 function extractCafePostId(url: string): string | null {
   const m1 = url.match(/cafe\.naver\.com\/[^/?#]+\/(\d+)/);
   if (m1) return m1[1];
