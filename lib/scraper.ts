@@ -64,7 +64,19 @@ const CAFE_SECTION_SELECTORS = [
   '[class*="cafe_wrap"]',
 ];
 
+// 카드 하단 "관련글(RE:)" 영역 셀렉터 - 이 안의 링크는 메인 노출이 아님
+// 타 업체 카드의 메인글 아래 작게 표기된 관련글은 노출로 집계하지 않음
+const RELATED_POST_AREA = [
+  ".bx_etc",           // 네이버 카페 결과 카드 하단 관련글 영역
+  ".api_etc_area",     // API 기반 추가 항목 영역
+  ".detail_box_etc",   // 추가 상세 박스
+  "[class*='bx_etc']", // bx_etc 포함 클래스 변형
+  "[class*='etc_list']", // etc_list 포함 클래스 변형
+].join(", ");
+
 // 네이버 새 구조: div.sc_new 섹션 단위로 카운트 (각 섹션 = 카페 카드 한 장)
+// 노출 판정 기준: 해당 글이 카드의 "메인 제목"으로 노출된 경우만 카운트
+// 타 카페 카드 하단의 관련글(RE:)로만 표시된 경우는 노출이 아님
 function rankBySections($: cheerio.CheerioAPI, resolvedLink: string) {
   let foundRank: number | null = null;
   let postStats: string | null = null;
@@ -72,30 +84,41 @@ function rankBySections($: cheerio.CheerioAPI, resolvedLink: string) {
 
   $("div.sc_new").each((_, section) => {
     const $section = $(section);
-    // 이 섹션에 카페 게시글 링크가 있는지 확인
-    const hasCafePost = $section.find("a[href*='cafe.naver.com']").toArray().some((a) => {
-      const href = $(a).attr("href") || "";
-      return extractCafePostId(href) !== null;
-    });
-    if (!hasCafePost) return;
+
+    // 관련글 영역을 제외한 메인 카페 링크만 수집
+    const mainCafeLinks = $section
+      .find("a[href*='cafe.naver.com']")
+      .toArray()
+      .filter((a) => {
+        const href = $(a).attr("href") || "";
+        if (!extractCafePostId(href)) return false;
+        // 관련글(RE:) 컨테이너 안에 있으면 메인 노출이 아니므로 제외
+        return $(a).closest(RELATED_POST_AREA).length === 0;
+      });
+
+    // 메인 카페 링크가 없으면 이 카드는 카페 결과가 아님
+    if (mainCafeLinks.length === 0) return;
 
     cafeRank++;
 
     if (foundRank === null) {
-      $section.find("a[href*='cafe.naver.com']").each((_, a) => {
+      for (const a of mainCafeLinks) {
         const href = $(a).attr("href") || "";
-        if (!extractCafePostId(href)) return;
-        if (foundRank === null && linksMatch(href, resolvedLink)) {
+        if (linksMatch(href, resolvedLink)) {
           foundRank = cafeRank;
           const $parent = $(a).closest("li, .bx, article, [class*='item']");
           if ($parent.length) {
             const txt = $parent
               .find(".etc_dsc_area, .sub_txt, .ldate, [class*='date'], [class*='info']")
-              .map((_, el) => $(el).text().trim()).get().filter(Boolean).join(" ");
+              .map((_, el) => $(el).text().trim())
+              .get()
+              .filter(Boolean)
+              .join(" ");
             if (txt) postStats = txt;
           }
+          break;
         }
-      });
+      }
     }
   });
 
