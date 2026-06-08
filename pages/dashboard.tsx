@@ -21,7 +21,7 @@ const statusLabel = (r: Ranking | undefined) => {
   return <span className="text-gray-400 text-xs">-</span>;
 };
 
-const inputCls = "border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full";
+const inputCls = "border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full placeholder:text-gray-400 text-gray-900";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -355,16 +355,24 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex gap-2">
                   <input value={addForm.brand} onChange={(e) => setAddForm((p) => ({ ...p, brand: e.target.value }))}
-                    className={inputCls} placeholder="브랜드" />
+                    list="brand-list" className={inputCls} placeholder="브랜드" />
+                  <datalist id="brand-list">{brands.map((b) => <option key={b} value={b} />)}</datalist>
+
                   <input value={addForm.productName} onChange={(e) => setAddForm((p) => ({ ...p, productName: e.target.value }))}
-                    className={inputCls} placeholder="제품명" />
+                    list="product-list" className={inputCls} placeholder="제품명" />
+                  <datalist id="product-list">{productNames.map((p) => <option key={p} value={p} />)}</datalist>
+
                   <input value={addForm.cafeName} onChange={(e) => setAddForm((p) => ({ ...p, cafeName: e.target.value }))}
-                    className={inputCls} placeholder="카페명" />
+                    list="cafe-list" className={inputCls} placeholder="카페명" />
+                  <datalist id="cafe-list">{cafeNames.map((c) => <option key={c} value={c} />)}</datalist>
+
                   <input value={addForm.manager} onChange={(e) => setAddForm((p) => ({ ...p, manager: e.target.value }))}
-                    className={inputCls} placeholder="담당자" />
+                    list="manager-list" className={inputCls} placeholder="담당자" />
+                  <datalist id="manager-list">{managers.map((m) => <option key={m} value={m} />)}</datalist>
+
                   <input value={addForm.group} onChange={(e) => setAddForm((p) => ({ ...p, group: e.target.value }))}
                     list="group-list" className={inputCls} placeholder="그룹" />
-                  <datalist id="group-list">{brands.map((b) => <option key={b} value={b || ""} />)}</datalist>
+                  <datalist id="group-list">{brands.map((b) => <option key={b} value={b} />)}</datalist>
                 </div>
                 {addError && <p className="text-red-500 text-xs mt-2 bg-red-50 px-3 py-1.5 rounded-lg">{addError}</p>}
               </form>
