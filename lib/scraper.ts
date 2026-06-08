@@ -169,9 +169,12 @@ export async function checkNaverRanking(keyword: string, targetLink: string): Pr
     const $ = cheerio.load(response.data as string);
 
     // 새 Naver 구조: div.sc_new 섹션 단위로 카운트 (카드 기준 순위)
+    // 새 UI 감지 시 rankBySections 결과만 신뢰 — fallback으로 넘기지 않음
+    // (fallback rankInRoot는 관련글 필터가 없어서 관련글도 노출로 오판함)
     if ($("div.sc_new").length > 0) {
       const { foundRank, postStats } = rankBySections($, resolvedLink);
       if (foundRank !== null) return { rank: foundRank, status: "exposed", postStats };
+      return { rank: null, status: "not_exposed", postStats: null };
     }
 
     // 구버전 fallback: 카페 전용 섹션 탐색 후 링크 단위 카운트
